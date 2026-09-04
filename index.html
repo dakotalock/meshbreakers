@@ -1,35 +1,34 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover" />
-    <meta name="theme-color" content="#12151c" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, viewport-fit=cover"
+    />
+    <meta name="theme-color" content="#080e16" />
+    <meta
+      name="description"
+      content="Build a squad. Roll with the odds. Break the Lattice. A 3D tactical dice roguelike."
+    />
     <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-    <meta name="mobile-web-app-capable" content="yes" />
+    <meta
+      name="apple-mobile-web-app-status-bar-style"
+      content="black-translucent"
+    />
+    <link rel="apple-touch-icon" href="./icon-180.png" />
+    <link rel="manifest" href="./manifest.webmanifest" />
+    <link rel="icon" href="./icon.svg" type="image/svg+xml" />
     <title>Meshbreakers</title>
-    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='12' fill='%2312151c'/%3E%3C/svg%3E" />
-  <style>
-:root{--bg:#12151c;--panel:#1c212c;--panel2:#262c3a;--ink:#0b0d12;--bone:#e6dece;--muted:#9a9488;--rust:#d2663a;--teal:#2eb8b8;--gold:#d4b45a;--hp:#d94f45;--shield:#6ea0d4;--ok:#7cbc6a;--line:#343b4c;--tap:48px;--radius:12px;font-family:ui-rounded,Segoe UI,system-ui,sans-serif}*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}html,body{margin:0;padding:0;background:var(--bg);color:var(--bone);height:100%}body{min-height:100dvh;display:flex;justify-content:center}#app{width:100%;max-width:430px;min-height:100dvh;min-height:100svh;display:flex;flex-direction:column;background:radial-gradient(1200px 400px at 50% -80px,#1c2a33 0%,transparent 70%),var(--bg);position:relative}button,.tap{min-height:var(--tap);min-width:var(--tap);border:0;border-radius:10px;font:inherit;font-weight:650;letter-spacing:.02em;color:var(--ink);background:var(--gold);cursor:pointer;padding:0 14px}button.secondary{background:var(--panel2);color:var(--bone);border:1px solid var(--line)}button.danger{background:var(--rust);color:var(--bone)}button.teal{background:var(--teal);color:var(--ink)}button:disabled{opacity:.45}button:active{transform:translateY(1px)}.hdr{display:flex;align-items:center;gap:8px;padding:8px 10px;min-height:52px;border-bottom:1px solid var(--line);background:#0c0e14e6;position:sticky;top:0;z-index:5}.hdr .seed{font-variant-numeric:tabular-nums;color:var(--gold);font-size:13px;letter-spacing:.08em}.hdr .grow{flex:1}.iconbtn{width:44px;height:44px;min-width:44px;padding:0;background:var(--panel2);color:var(--bone);border:1px solid var(--line);font-size:16px}.screen{flex:1;overflow:auto;padding:12px 12px 20px;-webkit-overflow-scrolling:touch}.foot{position:sticky;bottom:0;padding:10px 12px calc(10px + env(safe-area-inset-bottom));background:linear-gradient(transparent,var(--bg) 30%);display:flex;gap:8px}.foot button{flex:1}.logo{font-size:28px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;margin:18px 0 6px}.logo span{color:var(--teal)}.tag{color:var(--muted);font-size:14px;line-height:1.4;margin-bottom:18px}.stack{display:flex;flex-direction:column;gap:10px}.row{display:flex;gap:8px;align-items:center}.field{width:100%;min-height:48px;border-radius:10px;border:1px solid var(--line);background:var(--ink);color:var(--bone);font:inherit;font-size:16px;padding:0 12px;letter-spacing:.12em;text-transform:uppercase}.card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:12px}.card h2{margin:0 0 6px;font-size:18px}.card .meta{color:var(--muted);font-size:13px}.faction{display:inline-block;font-size:11px;letter-spacing:.08em;text-transform:uppercase;padding:3px 8px;border-radius:999px;border:1px solid var(--line)}.faction.human{border-color:var(--gold)}.faction.cyborg{border-color:var(--rust)}.faction.allied{border-color:var(--teal)}.hero-pick{text-align:left;background:var(--panel);color:var(--bone);width:100%;border:1px solid var(--line)}.hero-pick.selected{outline:2px solid var(--teal)}.hpbar{height:10px;background:#2a1a1a;border-radius:99px;overflow:hidden;display:flex}.hpbar i{display:block;height:100%;background:var(--hp)}.hpbar b{display:block;height:100%;background:var(--shield)}.unit{border:1px solid var(--line);background:var(--panel);border-radius:12px;padding:10px;min-height:72px}.unit.valid{outline:2px dashed var(--teal)}.unit.dead{opacity:.4}.unit .name{font-weight:700}.intent{margin-top:6px;display:flex;align-items:center;gap:8px;font-size:13px;font-weight:700}.intent .glyph{width:32px;height:32px;min-width:32px;border-radius:6px;display:grid;place-items:center;background:var(--ink);border:1px solid var(--bone)}.intent.atk .glyph{border-width:2px}.intent.sup .glyph{border-style:dotted;border-width:2px}.chassis{font-size:12px;color:var(--muted)}.dice-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}.die{text-align:left;background:var(--panel2);color:var(--bone);border:1px solid var(--line);min-height:64px;padding:8px 10px}.die.picked{outline:2px solid var(--gold)}.die.used{opacity:.55}.die .verb{font-size:15px;font-weight:800}.die .who{font-size:11px;color:var(--muted)}.map{display:flex;flex-direction:column;gap:10px;padding:8px 0 40px}.map-row{display:flex;justify-content:center;gap:10px}.nbtn{width:92px;min-height:56px;background:var(--panel);color:var(--bone);border:1px solid var(--line);font-size:12px}.nbtn.here{outline:2px solid var(--gold)}.nbtn.reach{outline:2px solid var(--teal)}.nbtn.done{opacity:.4}.nbtn.boss{background:#3a2220}.log{font-size:12px;color:var(--muted);max-height:72px;overflow:auto;padding:6px 4px}.howto{font-size:14px;line-height:1.45}.howto li{margin:8px 0}.tiny{font-size:12px;color:var(--muted)}.choice{width:100%;text-align:left;background:var(--panel2);color:var(--bone);border:1px solid var(--line)}.choice .hint{display:block;font-weight:500;color:var(--muted);font-size:12px;margin-top:2px}.party-strip{display:flex;gap:8px;overflow:auto;padding-bottom:4px}.pip{flex:1;min-width:90px;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:8px;font-size:12px}
-</style>
-</head>
-<body>
-<div id="app"></div>
-<script>
-(async function(){
-  var n=6;
-  var parts=[];
-  for (var i=0;i<n;i++) {
-    var r = await fetch('js/p'+i+'.js');
-    if (!r.ok) throw new Error('missing js/p'+i+'.js');
-    parts.push(await r.text());
-  }
-  var s=document.createElement('script');
-  s.textContent=parts.join('');
-  document.body.appendChild(s);
-})().catch(function(e){
-  document.getElementById('app').textContent='Meshbreakers failed to load: '+e;
-});
-</script>
-</body>
+  </head>
+  <body>
+    <div id="app">
+      <div class="boot">
+        MESH<span>BREAKERS</span>
+        <p>Powering up the resistance…</p>
+      </div>
+    </div>
+    <noscript>Meshbreakers needs JavaScript to play.</noscript>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
 </html>

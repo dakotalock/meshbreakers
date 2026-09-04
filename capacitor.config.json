@@ -1,0 +1,7 @@
+{
+  "appId": "com.dakotalock.meshbreakers",
+  "appName": "Meshbreakers",
+  "webDir": "dist",
+  "backgroundColor": "#080e16",
+  "ios": { "contentInset": "never", "preferredContentMode": "mobile" }
+}
