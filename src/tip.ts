@@ -1,9 +1,9 @@
 /** Optional pay-what-you-want tip jar — home/title screen only. */
 export const TIP_LINKS = {
-  1: "https://donate.stripe.com/test_6oU4grazO8Hz1GmekI5EY00",
-  5: "https://donate.stripe.com/test_28E6ozeQ4bTL98O90o5EY01",
-  10: "https://donate.stripe.com/test_28EdR18rGcXPbgWb8w5EY02",
-  custom: "https://donate.stripe.com/test_8x29AL4bq7Dv3Ou0tS5EY03",
+  1: "https://donate.stripe.com/cNi5kF2oMd47c7AdCu9AA00",
+  5: "https://donate.stripe.com/cNi6oJgfCc038Vo55Y9AA01",
+  10: "https://donate.stripe.com/6oU3cx7J6fcfc7Acyq9AA02",
+  custom: "https://donate.stripe.com/6oU3cx1kI2pt4F841U9AA03",
 } as const;
 
 export type TipAmount = 1 | 5 | 10 | "custom";
