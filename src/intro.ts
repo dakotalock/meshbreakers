@@ -7,8 +7,8 @@ export function studioIntro(reduced: boolean, onGesture: () => void) {
   const root = document.createElement("div");
   root.className = `studio-boot ${reduced ? "still" : ""}`;
   root.setAttribute("role", "dialog"); root.setAttribute("aria-modal", "true");
-  root.setAttribute("aria-label", "co-created by Dakota Rain Lock and GPT Astra");
-  root.innerHTML = `<div class="boot-horizon"></div><div class="boot-stars"></div><div class="boot-core" aria-hidden="true"><i></i><i></i><i></i><b>✦</b></div><div class="boot-credit"><span>co-created by</span><strong>Dakota Rain Lock</strong><em>and</em><strong>GPT Astra</strong></div><button class="boot-skip" type="button">Tap to begin <span>♪ Sound on your first tap</span></button>`;
+  root.setAttribute("aria-label", "co-created by Dakota Rain Lock with GPT Astra and Rook");
+  root.innerHTML = `<div class="boot-horizon"></div><div class="boot-stars"></div><div class="boot-core" aria-hidden="true"><i></i><i></i><i></i><b>✦</b></div><div class="boot-credit"><span>co-created by</span><strong>Dakota Rain Lock</strong><em>with</em><strong>GPT Astra</strong><em>&</em><strong>Rook</strong></div><button class="boot-skip" type="button">Tap to begin <span>♪ Sound on your first tap</span></button>`;
   document.body.append(root);
   let done = false;
   const finish = (gesture = false) => {
@@ -18,7 +18,7 @@ export function studioIntro(reduced: boolean, onGesture: () => void) {
     root.classList.add("leaving");
     setTimeout(() => {root.remove(); app.inert = false; if (previousFocus?.isConnected) previousFocus.focus();}, reduced ? 0 : 450);
   };
-  const timer = window.setTimeout(() => finish(), reduced ? 2600 : 5700);
+  const timer = window.setTimeout(() => finish(), reduced ? 2800 : 6400);
   root.querySelector("button")!.addEventListener("click", () => finish(true));
   root.addEventListener("keydown", (event) => {
     if (event.key === "Escape" || event.key === "Enter" || event.key === " ") {event.preventDefault(); finish(true);}
