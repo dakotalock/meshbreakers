@@ -2,6 +2,25 @@ import type { Difficulty, Progress, Run } from "./types";
 
 export const DIFFICULTY_KEY = "meshbreakers.difficulty";
 
+export function cleanSeed(seed: string): string {
+  return (
+    seed
+      .trim()
+      .toUpperCase()
+      .replace(/[^A-Z0-9-]/g, "")
+      .slice(0, 20) || "RESIST"
+  );
+}
+
+/** Dev unlock seed */
+export const DEV_UNLOCK_SEED = "U2VA-8PWO-HMFV";
+
+export function applyDevUnlock(seed: string, progress?: Progress): boolean {
+  if (!progress || cleanSeed(seed) !== DEV_UNLOCK_SEED) return false;
+  progress.hardCleared = true;
+  return true;
+}
+
 /** A title preference configures a new journey; a saved run owns its difficulty. */
 export function restoreDifficulty(
   raw: string | null,
