@@ -87,12 +87,14 @@ describe("difficulty selection and saved journeys", () => {
     expect(J.applyDevUnlock("u2va-8pwo-hmfv", progress)).toBe(true);
     expect(progress.hardCleared).toBe(true);
     const progress2 = G.loadProgress(null);
+    expect(J.applyDevUnlock("U2VA-8PWO-HMFV", progress2)).toBe(true);
     const unlocked = G.createRun("u2va-8pwo-hmfv", "rook", "paradox", progress2);
     expect(progress2.hardCleared).toBe(true);
     expect(unlocked.difficulty).toBe("paradox");
     expect(unlocked.seed).toBe("U2VA-8PWO-HMFV");
     expect(G.cycleOf(unlocked)).toBe(1);
     expect(J.restoreDifficulty("paradox", progress2, null)).toBe("paradox");
+    expect(J.applyDevUnlock(J.DEV_UNLOCK_SEED.toLowerCase(), progress2)).toBe(true);
     const again = G.createRun(J.DEV_UNLOCK_SEED.toLowerCase(), "rook", "hard", progress2);
     expect(again.difficulty).toBe("hard");
     expect(progress2.hardCleared).toBe(true);
