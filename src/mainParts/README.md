@@ -1,1 +1,1 @@
-Assembled into src/main.ts by scripts/assemble-main.mjs before build/test/dev.
+Assembled into src/main.ts by scripts/inflate-main.mjs (gzip+base64 parts).
