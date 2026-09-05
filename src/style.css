@@ -2667,3 +2667,11 @@ em {
 @media(max-height:700px) and (orientation:portrait){.attract-caption{bottom:25px}.attract-kicker{display:none}.attract-caption p{font-size:11px;margin:5px 0}.rewind-panel .timeline-seal{width:55px;height:55px;min-height:55px;font-size:25px;margin:7px auto}.rewind-panel .story{font-size:12px}.carry-note{font-size:10px;margin:3px auto 8px}}
 @media(max-height:480px) and (orientation:landscape){.boot-core{width:85px;height:85px;margin-bottom:16px}.boot-credit{gap:5px}.boot-credit strong{font-size:24px}.boot-skip{bottom:3px;font-size:9px;padding:8px}.boot-skip span{display:none}.attract-kicker{display:none}.attract-caption{bottom:12px}.attract-caption p{font-size:11px}.timeline-seal{display:none}.carry-note{font-size:10px;margin:5px auto}}
 .reduce-motion .studio-boot *,.reduce-motion .time-transition{animation:none!important;transition:none!important}
+
+/* Keep the actual run mode visible without widening the phone HUD. */
+.sector{display:flex;flex-direction:column;align-items:center;gap:1px;line-height:1.2}
+.sector .run-mode{font-size:11px;letter-spacing:.7px;text-transform:uppercase;color:#bfd0e6;font-weight:700}
+.sector .run-mode[data-difficulty="hard"]{color:#ead0a0}
+.sector .run-mode[data-difficulty="paradox"]{color:#bcd9ff}
+.sector>span{font-size:10px}
+@media(min-width:900px){.sector .run-mode{font-size:12px}.sector>span{font-size:11px}}

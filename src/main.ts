@@ -17,6 +17,7 @@ import {
 } from "./content";
 import { icon, dicePips } from "./icons";
 import * as G from "./engine";
+import * as J from "./journey";
 import type { Run, Unit, Skill, Difficulty } from "./types";
 const app = document.querySelector<HTMLDivElement>("#app")!;
 let run: Run | null = null,
@@ -52,6 +53,7 @@ try {
   storageIssue = true;
 }
 const progress = G.loadProgress(localStorageSafe(G.PROGRESS_KEY), saved);
+difficulty = J.restoreDifficulty(localStorageSafe(J.DIFFICULTY_KEY), progress, saved);
 const music = new Music();
 music.configure(settings.music, settings.musicVolume);
 const sound = new Sound();
@@ -75,6 +77,11 @@ const esc = (s: string) =>
         c
       ]!,
   );
+function rememberDifficulty(value: Difficulty) {
+  difficulty = value;
+  try { localStorage.setItem(J.DIFFICULTY_KEY, value); }
+  catch { storageIssue = true; }
+}
 function save() {
   try {
     if (run) {
@@ -128,7 +135,7 @@ function unitName(u: Unit) {
 }
 function topbar() {
   const r = screen === "game" ? run : null;
-  return `<header class="topbar"><div class="wordmark">${icon("hex")}<span>MESH<b>BREAKERS</b></span></div><div class="top-info">${r ? `<span class="sector">${r.difficulty === "paradox" ? `<b class="cycle-tag">${["I","II","III"][G.cycleOf(r)-1]}</b> · ` : ""}FLOOR <b>${r.act}</b><span> / ${G.campaignFloors(r)}</span></span><span class="scrap">${icon("diamond")} ${r.gold}</span>` : '<span class="build-tag">THE UNWRITTEN HOUR</span>'}</div><div class="top-actions">${r ? btn("relics", `${icon("diamond")}<small>${r.relics.length}</small>`, "icon-button relic-count", false, 'aria-label="Inspect collected relics"') : btn("sound", icon(settings.sound ? "sound" : "mute"), "icon-button", false, 'aria-label="Toggle sound effects"')}${btn("menu", icon("menu"), "icon-button", false, 'aria-label="Game menu"')}</div></header>`;
+  return `<header class="topbar"><div class="wordmark">${icon("hex")}<span>MESH<b>BREAKERS</b></span></div><div class="top-info">${r ? `<span class="sector"><small class="run-mode" data-difficulty="${r.difficulty}">${G.modeName(r.difficulty)}${r.difficulty === "paradox" ? ` · ${["I","II","III"][G.cycleOf(r)-1]}` : ""}</small><span>FLOOR <b>${r.act}</b> / ${G.campaignFloors(r)}</span></span><span class="scrap">${icon("diamond")} ${r.gold}</span>` : '<span class="build-tag">THE UNWRITTEN HOUR</span>'}</div><div class="top-actions">${r ? btn("relics", `${icon("diamond")}<small>${r.relics.length}</small>`, "icon-button relic-count", false, 'aria-label="Inspect collected relics"') : btn("sound", icon(settings.sound ? "sound" : "mute"), "icon-button", false, 'aria-label="Toggle sound effects"')}${btn("menu", icon("menu"), "icon-button", false, 'aria-label="Game menu"')}</div></header>`;
 }
 function titlePanel() {
   const d = heroDef(starter);
@@ -145,7 +152,7 @@ function titlePanel() {
     },
   ).join(
     "",
-  )}</div><div class="starter-detail" style="--hero:${d.color}"><span>${factionName(d.faction)} · ${d.hp} HP</span><p>“${d.quote}”</p></div><div class="run-options"><div class="difficulty">${btn("difficulty", "Standard", "chip " + (difficulty === "normal" ? "active" : ""), false, 'data-id="normal"')}${btn("difficulty", "Hard", "chip " + (difficulty === "hard" ? "active" : ""), false, 'data-id="hard"')}${btn("difficulty", `${!progress.hardCleared ? icon("lock") : ""}Paradox`, "chip paradox-chip " + (difficulty === "paradox" ? "active" : ""), false, `data-id="paradox" aria-label="Paradox${!progress.hardCleared ? ", locked. Beat Hard to unlock." : ": three five-floor cycles."}"`)}</div>${btn("seed-menu", `${icon("settings")} ${seed ? esc(seed) : "Run seed"}`, "seed-button")}</div>${btn("start", `New journey ${icon("arrow")}`, "primary wide")}${saved && !["won", "lost"].includes(saved.screen) ? btn("continue", `Continue <span>Floor ${saved.act} / ${G.campaignFloors(saved)}</span>${icon("arrow")}`, "continue wide") : ""}</div></div>`;
+  )}</div><div class="starter-detail" style="--hero:${d.color}"><span>${factionName(d.faction)} · ${d.hp} HP</span><p>“${d.quote}”</p></div><div class="run-options"><div class="difficulty">${btn("difficulty", "Standard", "chip " + (difficulty === "normal" ? "active" : ""), false, 'data-id="normal"')}${btn("difficulty", "Hard", "chip " + (difficulty === "hard" ? "active" : ""), false, 'data-id="hard"')}${btn("difficulty", `${!progress.hardCleared ? icon("lock") : ""}Paradox`, "chip paradox-chip " + (difficulty === "paradox" ? "active" : ""), false, `data-id="paradox" aria-label="Paradox${!progress.hardCleared ? ", locked. Beat Hard to unlock." : ": three five-floor cycles."}"`)}</div>${btn("seed-menu", `${icon("settings")} ${seed ? esc(seed) : "Run seed"}`, "seed-button")}</div>${btn("start", `New ${G.modeName(difficulty)} journey ${icon("arrow")}`, "primary wide")}${J.canContinue(saved) ? btn("continue", `Continue ${G.modeName(saved.difficulty)} <span>Floor ${saved.act} / ${G.campaignFloors(saved)}</span>${icon("arrow")}`, "continue wide") : ""}</div></div>`;
 }
 function heroStrip() {
   const h = activeHero(),
@@ -534,7 +541,9 @@ function dialogContent() {
   if (modal === "end")
     return `<h2>Leave dice unused?</h2><p>You have ${run!.battle!.dice.filter((d) => !d.used).length} dice left. Enemies will execute their displayed plans.</p>${btn("confirm-end", "End turn", "primary wide")}${btn("close", "Keep planning", "text-button wide")}`;
   if (modal === "new")
-    return `<h2>Start a new run?</h2><p>This replaces the current run saved on this device.</p>${btn("confirm-start", "Start fresh", "primary wide")}${btn("close", "Keep this run", "text-button wide")}`;
+    return `<h2>Start a new ${G.modeName(difficulty)} journey?</h2><p>This replaces your saved ${saved ? G.modeName(saved.difficulty) : ""} journey${saved ? ` on floor ${saved.act}` : ""}. Your difficulty unlocks stay with you.</p>${btn("confirm-start", `Start ${G.modeName(difficulty)}`, "primary wide")}${btn("close", "Keep this run", "text-button wide")}`;
+  if (modal === "continue-mode" && J.canContinue(saved))
+    return `<div class="eyebrow">SAVED JOURNEY · ${G.modeName(saved.difficulty).toUpperCase()}</div><h2>Continue ${G.modeName(saved.difficulty)}?</h2><p>Your saved squad is on floor ${saved.act} in <b>${G.modeName(saved.difficulty)}</b>. The <b>${G.modeName(difficulty)}</b> selection applies to a new journey.</p><p>Continuing keeps your existing squad, route and ${G.modeName(saved.difficulty)} difficulty.</p>${btn("confirm-continue", `Continue ${G.modeName(saved.difficulty)}`, "primary wide")}${btn("start", `Start a new ${G.modeName(difficulty)} journey`, "text-button wide")}${btn("close", "Back", "text-button wide")}`;
   if (modal === "replace")
     return `<h2>Make room for ${heroDef(replaceRecruit).name}?</h2><p>Choose a companion to leave at this safehouse. Their upgrades leave with them.</p><div class="choices">${run!.party.map((h) => btn("replace", `<span><strong>${heroDef(h.defId).name}</strong><small>Level ${h.level} · ${h.hp}/${h.maxHp} HP</small></span>`, "choice-card", false, `data-id="${h.uid}"`)).join("")}</div>`;
   if (modal.startsWith("relic:")) {
@@ -543,7 +552,7 @@ function dialogContent() {
   }
   if (modal === "squad")
     return `<h2>Your coalition</h2><div class="choices">${run!.party.map((h) => `<div class="roster-card"><strong style="color:${heroDef(h.defId).color}">${heroDef(h.defId).name}</strong><p>${heroDef(h.defId).role} · Lv.${h.level} · ${h.hp}/${h.maxHp} HP</p><small>${h.mods.length ? h.mods.map((m) => MODS.find((x) => x.id === m)!.name).join(" · ") : "No permanent upgrades yet."}</small></div>`).join("")}</div>`;
-  return `<div class="eyebrow">MESHBREAKERS</div><h2>Take a breath.</h2><div class="menu-options">${btn("help", `${icon("book")} Field manual`, "choice-card")}${run ? btn("squad", `${icon("people")} Your squad`, "choice-card") : ""}${btn("sound", `${icon(settings.sound ? "sound" : "mute")} Effects <b>${settings.sound ? "On" : "Off"}</b>`, "choice-card")}${btn("music", `${icon(settings.music ? "sound" : "mute")} Music <b>${settings.music ? "On" : "Off"}</b>`, "choice-card")}<label class="music-level">Music volume<input id="music-volume" type="range" min="0" max="100" value="${Math.round(settings.musicVolume*100)}" aria-label="Music volume" /></label>${btn("credits", `${icon("star")} Credits & soundtrack`, "choice-card")}${btn("motion", `${icon("star")} Reduced motion <b>${settings.reduced ? "On" : "Off"}</b>`, "choice-card")}${btn("quality", `${icon("volume")} Battery saver <b>${settings.low ? "On" : "Off"}</b>`, "choice-card")}${screen === "game" ? btn("home", `${icon("map")} Save & return to title`, "choice-card") : ""}</div><p class="subtle">${run ? "Run " + esc(run.seed) + " · " : ""}Saves stay on this device.</p><div class="install-tip"><b>Play from your Home Screen</b><p>In iPhone Safari, open Share and choose “Add to Home Screen.”</p></div>`;
+  return `<div class="eyebrow">MESHBREAKERS</div><h2>Take a breath.</h2><div class="menu-options">${btn("help", `${icon("book")} Field manual`, "choice-card")}${run ? btn("squad", `${icon("people")} Your squad`, "choice-card") : ""}${btn("sound", `${icon(settings.sound ? "sound" : "mute")} Effects <b>${settings.sound ? "On" : "Off"}</b>`, "choice-card")}${btn("music", `${icon(settings.music ? "sound" : "mute")} Music <b>${settings.music ? "On" : "Off"}</b>`, "choice-card")}<label class="music-level">Music volume<input id="music-volume" type="range" min="0" max="100" value="${Math.round(settings.musicVolume*100)}" aria-label="Music volume" /></label>${btn("credits", `${icon("star")} Credits & soundtrack`, "choice-card")}${btn("motion", `${icon("star")} Reduced motion <b>${settings.reduced ? "On" : "Off"}</b>`, "choice-card")}${btn("quality", `${icon("volume")} Battery saver <b>${settings.low ? "On" : "Off"}</b>`, "choice-card")}${screen === "game" ? btn("home", `${icon("map")} Save & return to title`, "choice-card") : ""}</div><p class="subtle">${run ? G.modeName(run.difficulty) + " · Run " + esc(run.seed) + " · " : ""}Saves stay on this device.</p><div class="install-tip"><b>Play from your Home Screen</b><p>In iPhone Safari, open Share and choose “Add to Home Screen.”</p></div>`;
 }
 let previousFocus: HTMLElement | null = null;
 function renderModal() {
@@ -587,6 +596,7 @@ async function resolve(fx: Parameters<Arena["animate"]>[0]) {
   }
 }
 function start() {
+  rememberDifficulty(difficulty);
   run = G.createRun(seed || G.newSeed(), starter, difficulty, progress);
   screen = "game";
   selectedHero = run.party[0].uid;
@@ -599,6 +609,19 @@ function start() {
       localStorage.setItem("meshbreakers.learned", "yes");
     } catch {}
   }
+}
+function resume(confirmed = false) {
+  const resumed = J.resumeJourney(saved, difficulty, confirmed);
+  if (!resumed) {
+    if (J.canContinue(saved)) openModal("continue-mode");
+    return;
+  }
+  modal = "";
+  run = resumed;
+  rememberDifficulty(run.difficulty);
+  screen = "game";
+  resetSelection();
+  render();
 }
 function localStorageSafe(key: string) {
   try {
@@ -679,7 +702,7 @@ app.addEventListener("click", async (e) => {
     case "preview-track": music.setCue(id as keyof typeof TRACKS); notify(TRACKS[id as keyof typeof TRACKS].title); break;
     case "replay-intro": closeModal(); studioIntro(settings.reduced, () => {sound.unlock(); music.unlock(); sound.play("intro");}); break;
     case "music": settings.music = !settings.music; music.configure(settings.music, settings.musicVolume); save(); render(); break;
-    case "select-paradox": if (progress.hardCleared) {difficulty = "paradox"; closeModal(); render();} break;
+    case "select-paradox": if (progress.hardCleared) {rememberDifficulty("paradox"); closeModal(); render();} break;
     case "rewind-cycle": {
       if (!G.rewindCycle(run!)) break;
       save(); busy = true; sound.play("rewind");
@@ -711,11 +734,12 @@ app.addEventListener("click", async (e) => {
       break;
     case "difficulty":
       if (id === "paradox") { openModal("paradox"); break; }
-      difficulty = id as Difficulty;
+      if (id !== "normal" && id !== "hard") break;
+      rememberDifficulty(id);
       render();
       break;
     case "start":
-      if (saved && !["won", "lost"].includes(saved.screen)) openModal("new");
+      if (J.canContinue(saved)) openModal("new");
       else start();
       break;
     case "confirm-start":
@@ -723,12 +747,10 @@ app.addEventListener("click", async (e) => {
       start();
       break;
     case "continue":
-      if (saved) {
-        run = saved;
-        screen = "game";
-        resetSelection();
-        render();
-      }
+      resume();
+      break;
+    case "confirm-continue":
+      resume(true);
       break;
     case "menu":
       openModal("menu");
@@ -764,6 +786,7 @@ app.addEventListener("click", async (e) => {
       break;
     case "home":
       modal = "";
+      if (run) rememberDifficulty(run.difficulty);
       save();
       screen = "home";
       render();
@@ -904,17 +927,21 @@ app.addEventListener("click", async (e) => {
       openModal("relic:" + id);
       break;
     case "new":
+      if (run) rememberDifficulty(run.difficulty);
       screen = "home";
       run = null;
       seed = "";
       render();
       break;
-    case "replay":
-      seed = run!.seed;
+    case "replay": {
+      const replay = J.replaySettings(run!);
+      seed = replay.seed;
+      rememberDifficulty(replay.difficulty);
       screen = "home";
       run = null;
       render();
       break;
+    }
   }
 });
 document.addEventListener("keydown", (e) => {
