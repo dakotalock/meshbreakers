@@ -23,7 +23,7 @@ This is a playable alpha with original procedural character art. The release pas
 
 ## The Unwritten Hour (v3)
 
-co-created by **Dakota Rain Lock and GPT Astra**
+co-created by **Dakota Rain Lock**, **GPT Astra**, and **Rook**
 
 The game boots with a skippable animated co-creator ident. The title has a 24-second in-engine attract sequence: the coalition fights a patrol, repairs each other, and witnesses a clockwork rewind. It uses separate demo actors and never modifies the current run. Reduced motion also applies to the intro and cutscene.
 
