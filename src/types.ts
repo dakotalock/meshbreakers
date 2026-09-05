@@ -12,7 +12,8 @@ export type Effect =
   | "drain"
   | "taunt"
   | "boost"
-  | "weaken";
+  | "weaken"
+  | "rewind";
 export type Skill = {
   id: string;
   name: string;
@@ -39,6 +40,7 @@ export type HeroDef = {
   passive: string;
   weapon: string;
   skills: Skill[];
+  rarity?: "mythic";
 };
 export type Unit = {
   uid: string;
@@ -131,12 +133,17 @@ export type Battle = {
   firstHit: boolean;
   overdrive: boolean;
   log: string[];
+  rewound?: boolean;
+  anchor?: { dice: Die[]; rerolls: number; party: { uid: string; hp: number }[] };
 };
+export type Difficulty = "normal" | "hard" | "paradox";
+export type Progress = { version: 1; hardCleared: boolean; paradoxCleared: boolean };
 export type Run = {
   version: 2;
   seed: string;
   rng: number;
-  difficulty: "normal" | "hard";
+  difficulty: Difficulty;
+  cycle?: number;
   screen:
     | "battle"
     | "map"
@@ -146,6 +153,7 @@ export type Run = {
     | "rest"
     | "event"
     | "upgrade"
+    | "rewind"
     | "won"
     | "lost";
   party: Unit[];
@@ -170,6 +178,7 @@ export type Run = {
 };
 export type FX = {
   kind:
+    | "rewind"
     | "ultimate"
     | "hit"
     | "shield"

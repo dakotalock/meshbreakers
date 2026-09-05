@@ -8,6 +8,8 @@ import type {
   FX,
   Intent,
   Reward,
+  Difficulty,
+  Progress,
 } from "./types";
 import {
   HEROES,
@@ -23,6 +25,24 @@ import {
 } from "./content";
 export const SAVE_KEY = "meshbreakers.run.v2";
 export const CHARGE = 6;
+export const PROGRESS_KEY = "meshbreakers.progress.v1";
+export const cycleOf = (r: Run) => r.cycle ?? 1;
+export const modeName = (mode: Difficulty) => mode === "normal" ? "Standard" : mode === "hard" ? "Hard" : "Paradox";
+export function loadProgress(raw: string | null, saved: Run | null = null): Progress {
+  let progress: Progress = {version: 1, hardCleared: false, paradoxCleared: false};
+  try { const p=JSON.parse(raw??"null"); if(p?.version===1)progress={version:1,hardCleared:p.hardCleared===true,paradoxCleared:p.paradoxCleared===true}; } catch {}
+  if(saved) recordVictory(progress,saved);
+  return progress;
+}
+export function recordVictory(p: Progress, r: Run) {
+  if(r.screen!=="won")return;
+  if(r.difficulty === "hard")p.hardCleared=true;
+  if(r.difficulty === "paradox" && cycleOf(r) === 3){p.paradoxCleared=true;p.hardCleared=true;}
+}
+export const canUpgrade = (r: Run) => r.party.some(h=>MODS.some(m=>h.mods.filter(x=>x===m.id).length<3));
+const cycleHP = (r: Run) => r.difficulty === "paradox" ? [1.12,2.05,3.2][cycleOf(r)-1] : 1;
+const cycleAttack = (r: Run) => r.difficulty === "paradox" ? [1.04,1.42,1.78][cycleOf(r)-1] : 1;
+
 export const campaignFloors = (r: Run) => Math.max(...r.maps.map((n) => n.act));
 export function hash(seed: string) {
   let n = 2166136261;
@@ -81,7 +101,7 @@ function makeEnemy(r: Run, id: string, elite = false, boss = false): Enemy {
     hp = Math.round(
       d.hp *
         (1 + (r.act - 1) * 0.22 + Math.max(0, r.act - 2) ** 2 * 0.07) *
-        (r.difficulty === "hard" ? 1.15 : 1),
+        (r.difficulty !== "normal" ? 1.15 : 1) * cycleHP(r),
     );
   return {
     uid: "e" + ++r.seq,
@@ -208,8 +228,10 @@ export function makeMaps(r: { rng: number }): MapNode[] {
 export function createRun(
   seed: string,
   starter: string,
-  difficulty: "normal" | "hard" = "normal",
+  difficulty: Difficulty = "normal",
+  progress?: Progress,
 ): Run {
+  if (difficulty === "paradox" && !progress?.hardCleared) throw new Error("Beat Hard mode to unlock Paradox.");
   if (!STARTERS.includes(starter)) throw new Error("Choose a starter hero.");
   const clean =
     seed
@@ -222,6 +244,7 @@ export function createRun(
     seed: clean,
     rng: hash(clean),
     difficulty,
+    cycle: 1,
     screen: "map",
     party: [],
     maps: [],
@@ -244,6 +267,7 @@ export function createRun(
     history: [],
   };
   r.maps = makeMaps(r);
+  configureCycle(r);
   r.party = [makeHero(r, starter)];
   enterNode(r, "1-0-1");
   return r;
@@ -305,7 +329,7 @@ function startBattle(r: Run, n: MapNode) {
       CHARGE,
       h.mods.filter((m) => m === "charge").length * 2 +
         (r.relics.includes("spark") ? 2 : 0) +
-        (h.defId === "juno" ? 2 : 0) +
+        (["juno", "lyra"].includes(h.defId) ? 2 : 0) +
         (n.terrain === "tower" ? 1 : 0),
     );
   }
@@ -316,7 +340,7 @@ function startBattle(r: Run, n: MapNode) {
         id,
         n.type === "elite",
         n.type === "boss" &&
-          ["doorman", "census", "seraph", "archivist", "lattice"].includes(id),
+          ["doorman", "census", "seraph", "archivist", "lattice", "aion"].includes(id),
       ),
     ),
     dice: [],
@@ -325,6 +349,7 @@ function startBattle(r: Run, n: MapNode) {
     terrain: n.terrain,
     nodeType: n.type,
     taunt: null,
+    rewound: false,
     firstHit: false,
     overdrive: false,
     log: ["The Lattice has your signal."],
@@ -356,6 +381,7 @@ function startRound(r: Run, first = false) {
     (_, i) => ({ id: i, value: roll(r), used: false, locked: false }),
   );
   for (const e of foes(r)) e.intent = makeIntent(r, e);
+  b.anchor = {dice: b.dice.map(d=>({...d})),rerolls:b.rerolls,party:r.party.map(h=>({uid:h.uid,hp:h.hp}))};
 }
 function makeIntent(r: Run, e: Enemy): Intent {
   const b = r.battle!,
@@ -365,7 +391,7 @@ function makeIntent(r: Run, e: Enemy): Intent {
       Math.round(
         d.damage * (1 + (r.act - 1) * 0.18 + Math.max(0, r.act - 2) * 0.05),
       ) +
-      (r.difficulty === "hard" ? 1 + Math.ceil(r.act * 0.7) : 0) +
+      (r.difficulty !== "normal" ? 1 + Math.ceil(r.act * 0.7) : 0) +
       (e.boss || e.elite ? Math.max(0, r.act - 2) * 2 : 0),
     a = living(r);
   const weakest = [...a].sort((x, y) => x.hp - y.hp)[0],
@@ -377,11 +403,9 @@ function makeIntent(r: Run, e: Enemy): Intent {
     t = target,
   ): Intent => ({
     effect,
-    value:
-      value +
-      (e.boss && ["hit", "sweep", "pierce"].includes(effect)
-        ? Math.max(0, round - 3) * 2
-        : 0),
+    value: ["hit", "sweep", "pierce"].includes(effect)
+      ? Math.round(value * cycleAttack(r)) + (e.boss ? Math.max(0, round - 3) * (r.difficulty === "paradox" ? 2 + cycleOf(r) : 2) : 0)
+      : value,
     target: t,
     name,
   });
@@ -457,6 +481,11 @@ function makeIntent(r: Run, e: Enemy): Intent {
         : round % 3 === 0
           ? hit(0, "Rewrite", "summon", e.uid)
           : hit(base, "Redaction", "pierce", weakest.uid);
+    case "aion":
+      return round % 4 === 1 ? hit(0,"Winding the hour","charge",e.uid)
+        : round % 4 === 2 ? hit(Math.round(base*.72),"Chronal claw","pierce",weakest.uid)
+        : round % 4 === 3 ? hit(Math.round(base*(e.hp<e.maxHp/2?.72:.55)),"Hourglass breath","sweep","all")
+        : hit(22 + cycleOf(r)*6,"Temporal scales","shield",e.uid);
     case "lattice":
       return e.hp < e.maxHp / 2
         ? round % 2 === 0
@@ -529,6 +558,7 @@ export function skillReason(
   dieId: number | null,
 ): string | null {
   if (r.screen !== "battle" || !r.battle || h.hp <= 0) return "Not available.";
+  if (s.effect === "rewind" && (r.battle.rewound || !r.battle.anchor)) return r.battle.rewound ? "Reprise already used this fight" : "No moment to return to";
   if (s.ultimate) return h.charge >= CHARGE ? null : `Needs ${CHARGE} charge`;
   if (h.used.includes(s.id)) return "Used this turn";
   const d = r.battle.dice.find((d) => d.id === dieId && !d.used);
@@ -600,7 +630,10 @@ function damage(
     label: actual === 0 ? "BLOCK" : undefined,
   });
   if (target.hp === 0) {
-    if (enemy && r.relics.includes("core") && !r.battle!.overdrive) {
+    if (enemy && target.defId === "lyra" && !target.revived) {
+      target.revived=true;target.hp=Math.min(12,target.maxHp);
+      fx.push({kind:"rewind",source:target.uid,target:target.uid,value:target.hp,label:"UNWRITTEN"});
+    } else if (enemy && r.relics.includes("core") && !r.battle!.overdrive) {
       r.battle!.overdrive = true;
       target.hp = 1;
       fx.push({
@@ -674,6 +707,16 @@ export function playSkill(
         (value === 6 && r.relics.includes("echo") ? 1 : 0) +
         (h.defId === "vesper" && h.used.length === 1 ? 1 : 0),
     );
+  }
+  if (s.effect === "rewind") {
+    const b=r.battle!, anchor=b.anchor!;
+    b.rewound=true;b.dice=anchor.dice.map(d=>({...d}));b.rerolls=anchor.rerolls;
+    for(const ally of r.party) {
+      const past=anchor.party.find(p=>p.uid===ally.uid);
+      if(past)ally.hp=Math.min(ally.maxHp,Math.max(ally.hp,past.hp));
+      ally.used=[];
+      fx.push({kind:"rewind",source:h.uid,target:ally.uid,value:0,label:"REPRISE"});
+    }
   }
   const apply = (effect: string, t: Unit, amount: number) => {
     switch (effect) {
@@ -952,6 +995,11 @@ function checkBattle(r: Run): boolean {
       : 0);
   if (recovery) healParty(r, recovery);
   if (b.nodeType === "boss" && r.act === campaignFloors(r)) {
+    if(r.difficulty === "paradox" && cycleOf(r)<3) {
+      r.screen="rewind";
+      r.result="The dragon folds its broken wings around the hour. The world begins again.";
+      return true;
+    }
     r.screen = "won";
     r.result =
       "For the first time, the network is quiet enough to hear the rain.";
@@ -959,6 +1007,21 @@ function checkBattle(r: Run): boolean {
   }
   r.rewards = makeRewards(r);
   r.screen = "reward";
+  return true;
+}
+function configureCycle(r: Run) {
+  if(r.difficulty!=="paradox")return;
+  r.maps.find(n=>n.act===5 && n.type==="boss")!.encounter=["aion","sentinel","cantor"];
+  if(cycleOf(r)>1) for(const n of r.maps) {
+    if(n.type==="fight" && n.act<=2) n.encounter=pick(r,[["sentinel","ripper","drone"],["cantor","ward","leech"],["reaper","scribe","drone"]]);
+  }
+}
+export function rewindCycle(r: Run): boolean {
+  if(r.screen!=="rewind" || r.difficulty!=="paradox" || cycleOf(r)>=3)return false;
+  r.cycle=cycleOf(r)+1;r.act=1;r.maps=makeMaps(r);configureCycle(r);
+  r.visited=[];r.nodeId="";r.battle=null;r.rewards=[];r.recruits=[];r.shop=[];r.eventId="";
+  for(const h of r.party){h.hp=h.maxHp;h.shield=0;h.shock=0;h.mark=0;h.weak=0;h.stun=false;h.used=[];}
+  r.screen="map";r.result=`Cycle ${r.cycle}. The coalition remembers. The machines have changed.`;
   return true;
 }
 function makeRewards(r: Run): Reward[] {
@@ -975,9 +1038,10 @@ function makeRewards(r: Run): Reward[] {
   const rewards: Reward[] = [
     ...rs,
     {
-      kind: "upgrade",
-      title: "Rewrite your limits",
-      desc: "Choose a permanent upgrade for one hero.",
+      kind: canUpgrade(r) ? "upgrade" : "gold",
+      title: canUpgrade(r) ? "Rewrite your limits" : "Salvaged chronium",
+      desc: canUpgrade(r) ? "Choose a permanent upgrade for one hero." : "All upgrades mastered. Take 30 scrap.",
+      value: 30,
     },
     {
       kind: "heal",
@@ -1036,9 +1100,11 @@ export function skipReward(r: Run) {
 export function offerRecruits(r: Run) {
   r.recruits = sample(
     r,
-    HEROES.filter((h) => !r.party.some((p) => p.defId === h.id)),
+    HEROES.filter((h) => !h.rarity && !r.party.some((p) => p.defId === h.id)),
     3,
   ).map((h) => h.id);
+  // A mythic signal replaces one common offer; never a starter or guaranteed drop.
+  if(r.act>=2 && !r.party.some(h=>h.defId==="lyra") && random(r)<.015) r.recruits[r.recruits.length-1]="lyra";
   r.screen = "recruit";
 }
 export function recruit(r: Run, id: string, replaceUid?: string): boolean {
@@ -1072,6 +1138,7 @@ export function price(r: Run, value: number) {
   return r.relics.includes("badge") ? Math.floor(value * 0.75) : value;
 }
 export function buy(r: Run, id: string) {
+  if(id === "upgrade" && !canUpgrade(r))return false;
   if (r.screen !== "shop") return false;
   const raw =
     id === "heal"
@@ -1105,6 +1172,7 @@ export function rest(r: Run, choice: "heal" | "upgrade") {
       );
     continueToMap(r);
   } else {
+    if(!canUpgrade(r))return false;
     r.screen = "upgrade";
     r.upgradeReturn = "map";
   }
@@ -1179,6 +1247,7 @@ export function eventChoice(r: Run, index: number) {
   }
   if (next === "recruit") offerRecruits(r);
   else if (next === "upgrade") {
+    if(!canUpgrade(r)){r.gold+=25;r.result="All upgrades mastered. Recovered 25 scrap.";continueToMap(r);return true;}
     r.screen = "upgrade";
     r.upgradeReturn = "map";
   } else continueToMap(r);
@@ -1197,11 +1266,16 @@ export function loadRun(raw: string | null): Run | null {
       "rest",
       "event",
       "upgrade",
+      "rewind",
       "won",
       "lost",
     ];
     if (
       r.version !== 2 ||
+      !["normal","hard","paradox"].includes(r.difficulty) ||
+      ![1,2,3].includes(cycleOf(r)) ||
+      (r.difficulty!=="paradox" && cycleOf(r)!==1) ||
+      (r.screen==="rewind" && (r.difficulty!=="paradox" || cycleOf(r)>=3)) ||
       typeof r.seed !== "string" ||
       !Number.isFinite(r.rng) ||
       !screens.includes(r.screen) ||
@@ -1216,6 +1290,7 @@ export function loadRun(raw: string | null): Run | null {
     // Keep the original three-floor saves playable without rewriting their routes.
     if (
       ![3, ACTS.length].includes(campaignFloors(r)) ||
+      (r.difficulty === "paradox" && (campaignFloors(r) !== 5 || (r.screen === "won" && cycleOf(r) !== 3))) ||
       r.act < 1 ||
       r.act > campaignFloors(r)
     )

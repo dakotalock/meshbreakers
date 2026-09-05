@@ -834,6 +834,17 @@ export const HEROES: HeroDef[] = [
       ),
     ],
   },
+  {
+    id: "lyra", name: "Lyra, the Unwritten", role: "Timewalker", faction: "cyborg", hp: 38, color: "#f2dfa1", weapon: "orb", rarity: "mythic",
+    quote: "This is not the only way the story can end.",
+    passive: "Unwritten: start with +2 charge. Once per fight, survive a fatal hit at 12 HP.",
+    skills: [
+      s("needle", "Thread of tomorrow", "crosshair", "Deal {v} damage, ignoring Block.", "enemy", "pierce", 5, 1.2),
+      s("restore", "A kinder moment", "heart", "Restore {v} HP to an ally.", "ally", "heal", 3, 1),
+      s("hasten", "Borrowed future", "chevrons", "Give an ally {v} Power for this fight.", "ally", "boost", 2, 0, {parity: "odd"}),
+      s("u", "Reprise", "star", "Once per fight: restore the shared dice and rerolls from the start of this turn. Refresh every hero’s basic abilities and restore their HP to at least its turn-start value. Enemies keep all damage and statuses. Other heroes keep their charge; Lyra spends hers.", "party", "rewind", 0, 0, {ultimate: true}),
+    ],
+  },
 ];
 export const STARTERS = ["rook", "iri", "nyx"];
 export const ENEMIES: EnemyDef[] = [
@@ -985,6 +996,7 @@ export const ENEMIES: EnemyDef[] = [
     blurb:
       "Erases the weakest hero. Below half health, its memory storm strikes everyone.",
   },
+  {id: "aion", name: "Aion, the Clockwork Wyrm", hp: 168, damage: 13, model: "dragon", color: "#efd08e", blurb: "An engine wearing the shape of a dragon. Read its four-beat cycle: wind up, piercing claw, breath across the squad, then a ward. Below half health its breath intensifies. Defeat it in all three Paradox cycles to break the loop."},
 ];
 export const RELICS: Relic[] = [
   {

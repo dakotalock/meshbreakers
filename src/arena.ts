@@ -144,6 +144,9 @@ export class Arena {
   private time = 0;
   private busyActors = new Set<string>();
   private cinematic = 0;
+  private attractStart = 0;
+  private attractBeat = -1;
+  private gate = new THREE.Group();
   private environment: THREE.WebGLRenderTarget;
   private floorGlow: THREE.MeshStandardMaterial;
   private motes: THREE.Points;
@@ -397,6 +400,15 @@ export class Arena {
       this.failed = false;
       this.container?.classList.remove("context-lost");
     });
+    this.gate.position.set(0, 1.6, -2.5);
+    ring(this.gate,1.58,.022,[0,0,0],"#ecd49d",1.8);
+    ring(this.gate,1.42,.012,[0,0,.01],"#a7dfff",1.7);
+    for(let i=0;i<12;i++) {
+      const angle=i*Math.PI/6;
+      const marker=box(this.gate,[.025,i%3===0?.18:.08,.025],[Math.sin(angle)*1.5,Math.cos(angle)*1.5,.03],"#eadfc4",.6,1);
+      marker.rotation.z=-angle;
+    }
+    this.gate.visible=false; this.scene.add(this.gate);
     this.loop();
   }
   attach(container: HTMLElement, labels: HTMLElement) {
@@ -466,7 +478,9 @@ export class Arena {
     this.camera.updateProjectionMatrix();
   }
   sync(heroes: Unit[], enemies: Unit[], mode = "battle", terrain = "foundry") {
+    if (mode !== this.mode) {this.attractStart=this.time; this.attractBeat=-1;}
     this.mode = mode;
+    this.gate.visible=mode === "attract";
     const units = [
       ...heroes.map((u, i) => ({
         u,
@@ -508,15 +522,16 @@ export class Arena {
       const x =
         (enemy ? 1 : -1) * (count === 1 ? 2.25 : 2.3 + (index === 1 ? 0.2 : 0));
       a.home.set(
-        mode === "title" && !enemy ? (index - (count - 1) / 2) * 2.1 : x,
+        (mode === "title" || mode === "attract") && !enemy ? (index - (count - 1) / 2) * 2.1 : x,
         0,
-        mode === "title" && !enemy ? (index === 1 ? 0.45 : 0) : z,
+        (mode === "title" || mode === "attract") && !enemy ? (index === 1 ? 0.45 : 0) : z,
       );
+      if (mode === "attract" && enemy) a.home.set(.65, 0, -1.65);
       a.root.position.copy(a.home);
       a.dead = u.hp <= 0;
       a.root.visible = !a.dead;
       a.root.rotation.y =
-        mode === "title"
+        (mode === "title" || mode === "attract")
           ? -0.22
           : enemy
             ? -Math.PI / 2 + 0.28
@@ -637,6 +652,7 @@ export class Arena {
       );
       a.shield.rotation.y = this.time * 0.2;
     }
+    if (this.mode === "attract" && !this.reduced) this.attract();
     for (let i = this.particles.length - 1; i >= 0; i--) {
       const p = this.particles[i];
       p.life -= dt;
@@ -653,6 +669,10 @@ export class Arena {
     if (!this.reduced) this.motes.rotation.y = this.time * 0.016;
     const old = this.camera.position.clone();
     const oldZoom = this.camera.zoom;
+    if (this.mode === "attract" && !this.reduced) {
+      this.camera.position.x += Math.sin((this.time-this.attractStart)*.2)*.2;
+      this.camera.position.y += Math.sin((this.time-this.attractStart)*.12)*.1;
+    }
     if (this.cinematic && !this.reduced) {
       this.camera.zoom = 1 + this.cinematic * 0.16;
       this.camera.updateProjectionMatrix();
@@ -670,6 +690,46 @@ export class Arena {
       this.camera.updateProjectionMatrix();
     }
   };
+  /** A looping in-engine vignette, entirely separate from the saved battle and RNG. */
+  private attract() {
+    const t=(this.time-this.attractStart)%24, beat=Math.floor(t*2);
+    const rook=this.actors.get("demo0"), iri=this.actors.get("demo1"), nyx=this.actors.get("demo2"), foe=this.actors.get("demo-foe");
+    if (!rook || !iri || !nyx || !foe) return;
+    const aim=foe.home.clone().add(new THREE.Vector3(0,1.5,0));
+    for(const actor of [rook,iri,nyx,foe]) {actor.root.position.copy(actor.home); actor.root.rotation.y=-.22;}
+    this.gate.rotation.z=-t*.085;
+    this.gate.scale.setScalar(1+Math.sin(t*.4)*.025);
+    if(t>=5 && t<9) {
+      const p=(t-5)/4, travel=Math.sin(p*Math.PI)*.62;
+      rook.root.position.lerpVectors(rook.home,foe.home,travel);
+      const direction=foe.home.clone().sub(rook.home); rook.root.rotation.y=Math.atan2(direction.x,direction.z);
+      if(rook.arms[1]) rook.arms[1].rotation.x=rook.restArms[1].x-Math.sin(p*Math.PI*2)*1.2;
+      rook.body.position.y+=Math.sin(p*Math.PI)*.12;
+      for(let i=0;i<rook.legs.length;i++) rook.legs[i].rotation.x=rook.restLegs[i].x+Math.sin(p*Math.PI*4+i*Math.PI)*.4;
+    } else rook.legs.forEach((leg,i)=>leg.rotation.copy(rook.restLegs[i]));
+    if(t>=9 && t<13) {
+      iri.root.rotation.y=Math.atan2(foe.home.x-iri.home.x,foe.home.z-iri.home.z);
+      iri.body.position.z=Math.sin(t*8)*.028;
+    } else iri.body.position.z=0;
+    if(t>=13 && t<18) {
+      nyx.arms.forEach((arm,i)=>{arm.rotation.x=nyx.restArms[i].x-.6*Math.sin((t-13)/5*Math.PI);});
+      nyx.orbitals.forEach(o=>o.rotation.z=t*.2);
+    }
+    if(t>=18) {
+      foe.root.position.y=Math.sin((t-18)/6*Math.PI)*.8;
+      foe.root.rotation.y=-.22-(t-18)*.6;
+      this.gate.rotation.z=(t-18)*.6;
+    }
+    const caption=this.container?.querySelector("[data-attract-caption]");
+    const line=t<5?"Some machines chose differently.":t<13?"Three strangers. One small rebellion.":t<18?"No one has to face the end alone.":"Even time can be broken.";
+    if(caption && caption.textContent!==line) caption.textContent=line;
+    if(beat===this.attractBeat) return;
+    this.attractBeat=beat;
+    if(beat===13) {void this.arc(aim,"#91e9ff",true); this.burst(aim,"#ecd49d",18);}
+    if(beat===20 || beat===22) {void this.projectile(iri.home.clone().add(new THREE.Vector3(0,1.6,0)),aim,"#a7caff"); this.burst(aim,"#b9d5ff",9);}
+    if(beat===28 || beat===31) for(const a of [rook,iri,nyx]) void this.pulse(a.home,"#90ebd9",.8,true);
+    if(beat===37 || beat===41) void this.pulse(this.gate.position,"#f1d69d",1.4);
+  }
   private burst(pos: THREE.Vector3, color: string, n = 20) {
     if (this.reduced) return;
     for (let i = 0; i < (this.low ? n / 2 : n); i++) {
@@ -895,6 +955,18 @@ export class Arena {
           announcement.remove();
           this.busyActors.delete(fx.source);
           continue;
+        }
+        if (fx.kind === "rewind") {
+          sound("rewind");
+          this.float(fx.target,fx.label ?? "REWIND","rewind");
+          void this.pulse(p,"#f2dfa1",1.8);
+          this.busyActors.add(fx.target);
+          await this.tween(440,t=>{
+            b.body.position.y=Math.sin(t*Math.PI)*.2;
+            b.orbitals.forEach(o=>o.rotation.y-=.13*(1-t));
+            this.cinematic=Math.sin(t*Math.PI)*.3;
+          });
+          b.body.position.y=0; this.busyActors.delete(fx.target); continue;
         }
         if (fx.kind === "death") {
           sound("death");

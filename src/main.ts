@@ -1,6 +1,8 @@
 import "./style.css";
 import { Arena } from "./arena";
 import { Sound } from "./audio";
+import { Music, TRACKS } from "./music";
+import { studioIntro } from "./intro";
 import {
   HEROES,
   STARTERS,
@@ -15,14 +17,14 @@ import {
 } from "./content";
 import { icon, dicePips } from "./icons";
 import * as G from "./engine";
-import type { Run, Unit, Skill } from "./types";
+import type { Run, Unit, Skill, Difficulty } from "./types";
 const app = document.querySelector<HTMLDivElement>("#app")!;
 let run: Run | null = null,
   saved: Run | null = null,
   screen = "home",
   starter = "rook",
   seed = "",
-  difficulty: "normal" | "hard" = "normal",
+  difficulty: Difficulty = "normal",
   selectedHero = "",
   selectedDie: number | null = null,
   selectedSkill: string | null = null,
@@ -35,6 +37,8 @@ let run: Run | null = null,
   pageContext = "";
 let settings = {
   sound: true,
+  music: true,
+  musicVolume: .35,
   low: false,
   reduced: matchMedia("(prefers-reduced-motion: reduce)").matches,
 };
@@ -47,6 +51,9 @@ try {
 } catch {
   storageIssue = true;
 }
+const progress = G.loadProgress(localStorageSafe(G.PROGRESS_KEY), saved);
+const music = new Music();
+music.configure(settings.music, settings.musicVolume);
 const sound = new Sound();
 sound.enabled = settings.sound;
 let arena: Arena | null = null;
@@ -71,9 +78,11 @@ const esc = (s: string) =>
 function save() {
   try {
     if (run) {
+      G.recordVictory(progress, run);
       localStorage.setItem(G.SAVE_KEY, JSON.stringify(run));
       saved = run;
     }
+    localStorage.setItem(G.PROGRESS_KEY, JSON.stringify(progress));
     localStorage.setItem("meshbreakers.settings", JSON.stringify(settings));
   } catch {
     storageIssue = true;
@@ -119,11 +128,11 @@ function unitName(u: Unit) {
 }
 function topbar() {
   const r = screen === "game" ? run : null;
-  return `<header class="topbar"><div class="wordmark">${icon("hex")}<span>MESH<b>BREAKERS</b></span></div><div class="top-info">${r ? `<span class="sector">FLOOR <b>${r.act}</b><span> / ${G.campaignFloors(r)}</span></span><span class="scrap">${icon("diamond")} ${r.gold}</span>` : '<span class="build-tag">ECHOES OF THE LATTICE</span>'}</div><div class="top-actions">${r ? btn("relics", `${icon("diamond")}<small>${r.relics.length}</small>`, "icon-button relic-count", false, 'aria-label="Inspect collected relics"') : btn("sound", icon(settings.sound ? "sound" : "mute"), "icon-button", false, 'aria-label="Toggle sound"')}${btn("menu", icon("menu"), "icon-button", false, 'aria-label="Game menu"')}</div></header>`;
+  return `<header class="topbar"><div class="wordmark">${icon("hex")}<span>MESH<b>BREAKERS</b></span></div><div class="top-info">${r ? `<span class="sector">${r.difficulty === "paradox" ? `<b class="cycle-tag">${["I","II","III"][G.cycleOf(r)-1]}</b> · ` : ""}FLOOR <b>${r.act}</b><span> / ${G.campaignFloors(r)}</span></span><span class="scrap">${icon("diamond")} ${r.gold}</span>` : '<span class="build-tag">THE UNWRITTEN HOUR</span>'}</div><div class="top-actions">${r ? btn("relics", `${icon("diamond")}<small>${r.relics.length}</small>`, "icon-button relic-count", false, 'aria-label="Inspect collected relics"') : btn("sound", icon(settings.sound ? "sound" : "mute"), "icon-button", false, 'aria-label="Toggle sound effects"')}${btn("menu", icon("menu"), "icon-button", false, 'aria-label="Game menu"')}</div></header>`;
 }
 function titlePanel() {
   const d = heroDef(starter);
-  return `<div class="title-panel"><div class="title-heading"><span class="eyebrow">A COALITION AGAINST THE END</span><h1>Meshbreakers</h1><p>Echoes of the Lattice</p></div><div class="title-menu"><div class="choose-label">CHOOSE YOUR FIRST HERO ${btn("hero-info", icon("info"), "mini-icon", false, 'aria-label="Inspect starting hero"')}</div><div class="starter-grid">${STARTERS.map(
+  return `<div class="title-panel"><div class="title-heading"><span class="eyebrow">A COALITION AGAINST THE END</span><h1>Meshbreakers</h1><p>The Unwritten Hour</p></div><div class="title-menu"><div class="choose-label">CHOOSE YOUR FIRST HERO ${btn("hero-info", icon("info"), "mini-icon", false, 'aria-label="Inspect starting hero"')}</div><div class="starter-grid">${STARTERS.map(
     (id) => {
       const h = heroDef(id);
       return btn(
@@ -136,7 +145,7 @@ function titlePanel() {
     },
   ).join(
     "",
-  )}</div><div class="starter-detail" style="--hero:${d.color}"><span>${factionName(d.faction)} · ${d.hp} HP</span><p>“${d.quote}”</p></div><div class="run-options"><div class="difficulty">${btn("difficulty", "Standard", "chip " + (difficulty === "normal" ? "active" : ""), false, 'data-id="normal"')}${btn("difficulty", "Hard", "chip " + (difficulty === "hard" ? "active" : ""), false, 'data-id="hard"')}</div>${btn("seed-menu", `${icon("settings")} ${seed ? esc(seed) : "Run seed"}`, "seed-button")}</div>${btn("start", `New journey ${icon("arrow")}`, "primary wide")}${saved && !["won", "lost"].includes(saved.screen) ? btn("continue", `Continue <span>Floor ${saved.act} / ${G.campaignFloors(saved)}</span>${icon("arrow")}`, "continue wide") : ""}</div></div>`;
+  )}</div><div class="starter-detail" style="--hero:${d.color}"><span>${factionName(d.faction)} · ${d.hp} HP</span><p>“${d.quote}”</p></div><div class="run-options"><div class="difficulty">${btn("difficulty", "Standard", "chip " + (difficulty === "normal" ? "active" : ""), false, 'data-id="normal"')}${btn("difficulty", "Hard", "chip " + (difficulty === "hard" ? "active" : ""), false, 'data-id="hard"')}${btn("difficulty", `${!progress.hardCleared ? icon("lock") : ""}Paradox`, "chip paradox-chip " + (difficulty === "paradox" ? "active" : ""), false, `data-id="paradox" aria-label="Paradox${!progress.hardCleared ? ", locked. Beat Hard to unlock." : ": three five-floor cycles."}"`)}</div>${btn("seed-menu", `${icon("settings")} ${seed ? esc(seed) : "Run seed"}`, "seed-button")}</div>${btn("start", `New journey ${icon("arrow")}`, "primary wide")}${saved && !["won", "lost"].includes(saved.screen) ? btn("continue", `Continue <span>Floor ${saved.act} / ${G.campaignFloors(saved)}</span>${icon("arrow")}`, "continue wide") : ""}</div></div>`;
 }
 function heroStrip() {
   const h = activeHero(),
@@ -183,6 +192,7 @@ const effectNames: Record<string, string> = {
   taunt: "BLOCK / TAUNT",
   boost: "POWER",
   weaken: "WEAK",
+  rewind: "REWIND",
 };
 function skillCard(h: Unit, s: Skill) {
   const r = run!,
@@ -209,7 +219,7 @@ function skillCard(h: Unit, s: Skill) {
     "skill",
     `<span class="skill-top">${icon(s.icon)}<span>${used ? "USED" : requirement(s)}</span></span><strong>${s.name}</strong><span class="skill-value">${used ? icon("check") : `${s.effect === "stun" ? "" : `<b>${value}</b>`} ${effectNames[s.effect]}`}</span>${s.extra ? `<i class="skill-extra">+ ${effectNames[s.extra]}</i>` : ""}`,
     `skill-card ${selected ? "selected" : ""} ${reason && reason !== "Select a die" ? "unavailable" : ""}`,
-    used,
+    false,
     `data-id="${s.id}" title="${esc(detail)}" aria-label="${esc(detail)}" aria-pressed="${selected}"`,
   );
 }
@@ -219,12 +229,12 @@ function battlePanel() {
     h = activeHero()!,
     d = heroDef(h.defId),
     ult = d.skills[3];
-  return `<div class="battle-panel">${heroStrip()}<div class="dice-row"><div class="dice-tray" style="--dice:${b.dice.length}">${b.dice.map((d) => `<div class="die-wrap ${d.used ? "spent" : ""}">${btn("die", dicePips(d.value), `die ${selectedDie === d.id ? "selected" : ""} ${d.value === 6 ? "six" : ""}`, d.used || busy, `data-id="${d.id}" aria-label="Select die ${d.value}" aria-pressed="${selectedDie === d.id}"`)}${btn("lock", icon(d.used ? "check" : "lock"), "die-lock " + (d.locked ? "locked" : ""), d.used || busy, `data-id="${d.id}" aria-label="${d.locked ? "Unlock" : "Keep"} die ${d.value}" aria-pressed="${d.locked}"`)}</div>`).join("")}</div>${btn("reroll", `${icon("reroll")}<b>${b.rerolls}</b><small>REROLL</small>`, "reroll", busy || b.rerolls === 0 || !b.dice.some((d) => !d.used && !d.locked))}</div><div class="selected-caption"><span>${selectedSkill ? "CHOOSE A TARGET" : selectedDie === null ? "SELECT A DIE" : "SELECT A COMMAND"}</span>${btn("hero-info", `${d.name.split(" ")[0]} ${icon("info")}`, "inspect-button", false, 'aria-label="Inspect hero abilities and passive"')}</div><div class="skills" style="--hero:${d.color}">${d.skills
+  return `<div class="battle-panel">${heroStrip()}<div class="dice-row"><div class="dice-tray" style="--dice:${b.dice.length}">${b.dice.map((d) => `<div class="die-wrap ${d.used ? "spent" : ""}">${btn("die", dicePips(d.value), `die ${selectedDie === d.id ? "selected" : ""} ${d.value === 6 ? "six" : ""}`, d.used || busy, `data-id="${d.id}" aria-label="Select die ${d.value}" aria-pressed="${selectedDie === d.id}"`)}${btn("lock", icon(d.used ? "check" : "lock"), "die-lock " + (d.locked ? "locked" : ""), d.used || busy, `data-id="${d.id}" aria-label="${d.locked ? "Unlock" : "Keep"} die ${d.value}" aria-pressed="${d.locked}"`)}</div>`).join("")}</div>${btn("reroll", `${icon("reroll")}<b>${b.rerolls}</b><small>REROLL</small>`, "reroll", busy || b.rerolls === 0 || !b.dice.some((d) => !d.used && !d.locked))}</div><div class="selected-caption"><span>${selectedSkill ? "CHOOSE A TARGET" : selectedDie === null ? "SELECT A DIE" : "SELECT A COMMAND"}</span>${btn("hero-info", `Abilities ${icon("book")}`, "inspect-button", false, 'aria-label="Inspect hero abilities and passive"')}</div><div class="skills" style="--hero:${d.color}">${d.skills
     .slice(0, 3)
     .map((s) => skillCard(h, s))
     .join(
       "",
-    )}</div><div class="turn-footer">${btn("ultimate", `${icon("star")}<span><strong>${ult.name}</strong><small>${h.charge >= G.CHARGE ? "LIMIT READY · FREE ACTION" : `LIMIT ${h.charge} / ${G.CHARGE}`}</small></span>`, `ultimate ${h.charge >= G.CHARGE ? "ready" : ""} ${selectedSkill === "u" ? "selected" : ""}`, busy || h.charge < G.CHARGE, `style="--hero:${d.color}" aria-label="${esc(ult.name + ". " + ult.desc.replace("{v}", String(G.skillValue(r, h, ult, 0))))}"`)}${btn("end", `End turn ${icon("arrow")}`, "primary end-turn", busy)}</div></div>`;
+    )}</div><div class="turn-footer">${btn("ultimate", `${icon("star")}<span><strong>${ult.name}</strong><small>${h.charge >= G.CHARGE ? "READY · TAP TO PREVIEW" : `LIMIT ${h.charge} / ${G.CHARGE} · DETAILS`}</small></span>`, `ultimate ${h.charge >= G.CHARGE ? "ready" : ""} ${selectedSkill === "u" ? "selected" : ""}`, busy, `style="--hero:${d.color}" aria-label="${esc(ult.name + ". " + ult.desc.replace("{v}", String(G.skillValue(r, h, ult, 0))))}"`)}${btn("end", `End turn ${icon("arrow")}`, "primary end-turn", busy)}</div></div>`;
 }
 function pagedChoices(cards: string[], size = 3) {
   const pages = Math.ceil(cards.length / size);
@@ -294,8 +304,8 @@ function recruitPanel() {
       const h = heroDef(id);
       return btn(
         "recruit",
-        `<span class="recruit-avatar">${icon(h.skills[0].icon)}</span><span><strong>${h.name}<em>${h.role}</em></strong><small>${h.passive}</small><span class="recruit-skills">${factionName(h.faction)} · ${h.hp} HP</span></span>`,
-        "choice-card recruit-card",
+        `<span class="recruit-avatar">${icon(h.skills[0].icon)}</span><span><strong>${h.name}<em>${h.rarity === "mythic" ? "MYTHIC · " : ""}${h.role}</em></strong><small>${h.passive}</small><span class="recruit-skills">${factionName(h.faction)} · ${h.hp} HP</span></span>`,
+        "choice-card recruit-card " + (h.rarity === "mythic" ? "mythic" : ""),
         false,
         `data-id="${id}" style="--hero:${h.color}"`,
       );
@@ -315,7 +325,7 @@ function upgradePanel() {
         `data-id="${m.id}"`,
       );
     }),
-  )}</div>`;
+  )}${btn("leave", "Continue without upgrading", "text-button wide journey-footer")}</div>`;
 }
 function shopPanel() {
   const r = run!;
@@ -342,14 +352,14 @@ function shopPanel() {
         "buy",
         `${icon(a.icon)}<span><strong>${a.name}</strong><small>${a.desc}</small></span><b class="price">${icon("diamond")}${cost}</b>`,
         "choice-card",
-        r.gold < cost,
+        r.gold < cost || (id === "upgrade" && !G.canUpgrade(r)),
         `data-id="${id}"`,
       );
     }),
   )}${btn("leave", `Continue ${icon("arrow")}`, "primary wide journey-footer")}</div>`;
 }
 function restPanel() {
-  return `<div class="journey-panel"><div class="journey-heading"><div class="eyebrow">SAFEHOUSE</div><h2>Beyond the signal.</h2></div><p class="story">Rain taps on a borrowed roof. For a moment, the network cannot find you.</p>${heroStrip()}<div class="choices">${btn("rest", `${icon("heart")}<span><strong>Rest and repair</strong><small>Restore ${run!.relics.includes("thermos") ? "60" : "35"}% maximum HP to everyone.</small></span>`, "choice-card", false, 'data-id="heal"')}${btn("rest", `${icon("chevrons")}<span><strong>Work through the night</strong><small>Give one hero a permanent upgrade.</small></span>`, "choice-card", false, 'data-id="upgrade"')}</div></div>`;
+  return `<div class="journey-panel"><div class="journey-heading"><div class="eyebrow">SAFEHOUSE</div><h2>Beyond the signal.</h2></div><p class="story">Rain taps on a borrowed roof. For a moment, the network cannot find you.</p>${heroStrip()}<div class="choices">${btn("rest", `${icon("heart")}<span><strong>Rest and repair</strong><small>Restore ${run!.relics.includes("thermos") ? "60" : "35"}% maximum HP to everyone.</small></span>`, "choice-card", false, 'data-id="heal"')}${btn("rest", `${icon("chevrons")}<span><strong>Work through the night</strong><small>Give one hero a permanent upgrade.</small></span>`, "choice-card", !G.canUpgrade(run!), 'data-id="upgrade"')}</div></div>`;
 }
 function eventPanel() {
   const e = EVENTS.find((e) => e.id === run!.eventId)!;
@@ -358,7 +368,7 @@ function eventPanel() {
 function finishPanel() {
   const r = run!,
     win = r.screen === "won";
-  return `<div class="journey-panel end-panel"><div class="journey-heading"><div class="eyebrow">${win ? "THE LATTICE IS BROKEN" : "THE SIGNAL WENT QUIET"}</div><h2>${win ? "The future is open." : "A spark remains."}</h2></div><p class="story">${win ? "They were built to obey. They chose each other. Somewhere in the quiet, a machine starts planting a garden." : "Somewhere in the city, someone else decides that enough is enough."}</p><div class="run-stats"><div><b>${r.stats.kills}</b><span>Defeated</span></div><div><b>${r.stats.turns}</b><span>Turns</span></div><div><b>${r.stats.recruits}</b><span>Recruited</span></div><div><b>${r.act}/${G.campaignFloors(r)}</b><span>Floors</span></div></div><p class="subtle">${r.seed} · ${r.difficulty === "hard" ? "HARD" : "STANDARD"}</p>${btn("new", `Another journey ${icon("arrow")}`, "primary wide")}${btn("replay", "Replay this seed", "text-button wide")}</div>`;
+  return `<div class="journey-panel end-panel"><div class="journey-heading"><div class="eyebrow">${win ? "THE LATTICE IS BROKEN" : "THE SIGNAL WENT QUIET"}</div><h2>${win ? "The future is open." : "A spark remains."}</h2></div><p class="story">${win ? "They were built to obey. They chose each other. Somewhere in the quiet, a machine starts planting a garden." : "Somewhere in the city, someone else decides that enough is enough."}</p><div class="run-stats"><div><b>${r.stats.kills}</b><span>Defeated</span></div><div><b>${r.stats.turns}</b><span>Turns</span></div><div><b>${r.stats.recruits}</b><span>Recruited</span></div><div><b>${r.difficulty === "paradox" ? (G.cycleOf(r)-1)*5+r.act : r.act}/${r.difficulty === "paradox" ? 15 : G.campaignFloors(r)}</b><span>Floors</span></div></div><p class="subtle">${r.seed} · ${G.modeName(r.difficulty).toUpperCase()}${r.difficulty === "paradox" ? win ? " · THREE TIMELINES LIBERATED" : ` · TIMELINE ${G.cycleOf(r)} / 3` : ""}</p>${win && r.difficulty === "hard" ? `<div class="unlock-banner">${icon("lock")}<span><strong>PARADOX UNLOCKED</strong><small>Three timelines. One final chance.</small></span></div>` : ""}${btn("new", `Another journey ${icon("arrow")}`, "primary wide")}${btn("replay", "Replay this seed", "text-button wide")}</div>`;
 }
 function labels(heroes: Unit[], enemies: Unit[]) {
   const r = run,
@@ -412,6 +422,10 @@ function labels(heroes: Unit[], enemies: Unit[]) {
     })
     .join("");
 }
+function rewindPanel() {
+  const r = run!, next = G.cycleOf(r) + 1;
+  return `<div class="journey-panel rewind-panel"><div class="journey-heading"><div class="eyebrow">AION · TEMPORAL COLLAPSE</div><h2>This was only<br>one ending.</h2></div><div class="timeline-seal" aria-hidden="true">${["I","II","III"][next-1]}</div><p class="story">The clockwork wyrm breaks the hour in its jaws. The city unfolds. Your coalition remembers.</p><p class="carry-note">TIMELINE ${next} / 3 · RETURN TO FLOOR 1<br>Your surviving squad, upgrades, relics and scrap carry forward. Everyone heals to full. Enemy health and damage increase.</p>${btn("rewind-cycle", `Enter timeline ${next} ${icon("reroll")}`, "primary wide journey-footer")}</div>`;
+}
 function render() {
   const r = screen === "game" ? run : null;
   const context = r ? `${r.nodeId}:${r.screen}` : "title";
@@ -432,6 +446,7 @@ function render() {
       upgrade: upgradePanel,
       won: finishPanel,
       lost: finishPanel,
+      rewind: rewindPanel,
     };
     panel = panels[r.screen]();
   }
@@ -448,19 +463,19 @@ function render() {
           }) as Unit,
       );
   const enemies =
-    r?.screen === "battle" ? r.battle!.enemies.filter((e) => e.hp > 0) : [];
+    r?.screen === "battle" ? r.battle!.enemies.filter((e) => e.hp > 0) : !r ? [{uid: "demo-foe", defId: "drone", hp: 20, maxHp: 20, shield: 0} as Unit] : [];
   const terrain =
     r?.battle?.terrain ??
     G.currentNode(r ?? ({ maps: [], nodeId: "" } as unknown as Run))?.terrain ??
     "foundry";
   const battle = r?.screen === "battle";
-  app.innerHTML = `${topbar()}<main class="play-layout ${r ? "in-game " + r.screen : "title-screen"}"><section class="arena ${!arena ? "no-webgl" : ""}" id="arena">${battle ? `<div class="phase-bar"><span class="phase-dot"></span><strong>${busy ? "RESOLVING" : "YOUR TURN"}</strong><span>TURN ${r.battle!.round}</span>${btn("field", `${TERRAINS[terrain].name} ${icon("info")}`, "field-button")}</div>` : ""}<div id="labels" class="unit-labels ${battle ? "" : "hidden"}">${battle ? labels(heroes, enemies) : ""}</div><div class="arena-vignette"></div>${!r ? '<div class="arena-title"><span>HUMAN · CYBORG · FREE MACHINE</span></div>' : !battle ? `<div class="arena-caption"><span>${r.screen === "map" ? "ASCEND THE LATTICE" : ACTS[r.act - 1]}</span></div>` : `<div class="arena-caption battle-caption"><span>${r.battle!.nodeType === "boss" ? "BOSS ENCOUNTER" : r.battle!.nodeType === "elite" ? "ELITE ENCOUNTER" : "TACTICAL ENGAGEMENT"}</span>${btn("help", icon("book"), "mini-icon", false, 'aria-label="Field manual"')}</div>`}${battle && selectedSkill ? `<div class="target-banner">${icon("crosshair")} ${getSelectedSkill()?.target === "ally" ? "Choose an ally below" : "Choose an enemy"} ${btn("cancel", icon("x"), "mini-icon", false, 'aria-label="Cancel targeting"')}</div>` : ""}${!arena ? '<div class="graphics-note">3D unavailable. Use the target cards above.</div>' : ""}<div class="context-note">Graphics paused. Reload to restore the arena.</div></section><section class="command-panel" ${busy ? "inert" : ""}>${panel}</section></main><div id="toast" class="toast ${message ? "show" : ""}" role="status" aria-live="polite">${esc(message)}</div>${storageIssue ? '<div class="storage-note">Saving is unavailable in this session.</div>' : ""}<div id="modal-root"></div>`;
+  app.innerHTML = `${topbar()}<main class="play-layout ${r ? "in-game " + r.screen : "title-screen"}"><section class="arena ${!arena ? "no-webgl" : ""}" id="arena">${battle ? `<div class="phase-bar"><span class="phase-dot"></span><strong>${busy ? "RESOLVING" : "YOUR TURN"}</strong><span>TURN ${r.battle!.round}</span>${btn("field", `${TERRAINS[terrain].name} ${icon("info")}`, "field-button")}</div>` : ""}<div id="labels" class="unit-labels ${battle ? "" : "hidden"}">${battle ? labels(heroes, enemies) : ""}</div><div class="arena-vignette"></div>${!r ? '<div class="attract-caption"><span class="attract-kicker">ECHOES OF A TOMORROW</span><p data-attract-caption>Some machines chose differently.</p><i></i></div>' : !battle ? `<div class="arena-caption"><span>${r.screen === "map" ? "ASCEND THE LATTICE" : ACTS[r.act - 1]}</span></div>` : `<div class="arena-caption battle-caption"><span>${r.battle!.nodeType === "boss" ? "BOSS ENCOUNTER" : r.battle!.nodeType === "elite" ? "ELITE ENCOUNTER" : "TACTICAL ENGAGEMENT"}</span>${btn("help", icon("book"), "mini-icon", false, 'aria-label="Field manual"')}</div>`}${battle && selectedSkill ? `<div class="target-banner">${icon("crosshair")} ${getSelectedSkill()?.target === "ally" ? "Choose an ally below" : "Choose an enemy"} ${btn("cancel", icon("x"), "mini-icon", false, 'aria-label="Cancel targeting"')}</div>` : ""}${!arena ? '<div class="graphics-note">3D unavailable. Use the target cards above.</div>' : ""}<div class="context-note">Graphics paused. Reload to restore the arena.</div></section><section class="command-panel" ${busy ? "inert" : ""}>${panel}</section></main><div id="toast" class="toast ${message ? "show" : ""}" role="status" aria-live="polite">${esc(message)}</div>${storageIssue ? '<div class="storage-note">Saving is unavailable in this session.</div>' : ""}<div id="modal-root"></div>`;
   if (arena) {
     arena.attach(
       document.querySelector("#arena")!,
       document.querySelector("#labels")!,
     );
-    arena.sync(heroes, enemies, battle ? "battle" : "title", terrain);
+    arena.sync(heroes, enemies, battle ? "battle" : !r ? "attract" : "title", terrain);
     arena.select(
       r
         ? (activeHero()?.uid ?? "")
@@ -469,13 +484,24 @@ function render() {
   } else {
     document.querySelector(".unit-labels")?.classList.add("fallback-labels");
   }
+  music.setCue(!r ? "title" : r.screen === "won" ? "victory" : r.screen === "rewind" || (battle && r.battle!.nodeType === "boss") ? "boss" : battle ? "battle" : "refuge");
   if (modal) renderModal();
 }
 function dialogContent() {
+  if (modal === "paradox") return `<div class="eyebrow">${progress.hardCleared ? "UNLOCKED" : "LOCKED · BEAT HARD TO UNLOCK"}</div><h2>Paradox</h2><p>Aion, the Clockwork Wyrm, guards the fifth floor. Defeat it and the campaign rewinds to floor one. It happens twice. The third victory ends the loop.</p><div class="rule-grid"><div><b>3 × 5</b><span>floors</span></div><div><b>2</b><span>rewinds</span></div><div><b>1</b><span>final victory</span></div></div><p>Your surviving heroes, upgrades, relics and scrap carry over. The squad heals at every rewind. Routes change, early patrols strengthen, and enemy health and damage rise with every timeline.</p><p>Bosses telegraph their attacks and grow stronger each turn. Build a team that can both survive and end fights quickly.</p>${progress.hardCleared ? btn("select-paradox", "Enter Paradox", "primary wide") : btn("close", "I'll beat Hard first", "primary wide")}`;
+  if (modal === "credits") return `<div class="eyebrow">AN INDEPENDENT GAME</div><h2>Made of little rebellions.</h2><p class="credits-line">co-created by <b>Dakota Rain Lock</b> and <b>GPT Astra</b></p><p>Original characters, code, procedural animation and music, made for Meshbreakers. Thank you for playing.</p><h3>Original soundtrack</h3><div class="track-list">${Object.entries(TRACKS).map(([id,t]) => btn("preview-track", `<span><strong>${t.title}</strong><small>${t.scene}</small></span>${icon("sound")}`, "choice-card", false, `data-id="${id}"`)).join("")}</div>${btn("replay-intro", "Replay studio intro", "text-button wide")}`;
+  if (modal.startsWith("ability:")) {
+    const h = activeHero()!, skill = heroDef(h.defId).skills.find(s => s.id === modal.slice(8))!;
+    const die = run!.battle!.dice.find(d => d.id === selectedDie);
+    const value = skill.ultimate ? String(G.skillValue(run!, h, skill, 0)) : die ? String(G.skillValue(run!, h, skill, die.value)) : `${G.skillValue(run!,h,skill,1)}–${G.skillValue(run!,h,skill,6)}`;
+    const reason = G.skillReason(run!, h, skill, selectedDie);
+    const target = {enemy:"Choose one enemy", enemies:"All living enemies", ally:"Choose one living ally", party:"Your entire living squad", self:"This hero"}[skill.target];
+    return `<div class="eyebrow">${heroDef(h.defId).name} · ${skill.ultimate ? "ULTIMATE" : "BASIC ABILITY"}</div><h2>${skill.name}</h2><p class="ability-description">${esc(skill.desc.replace("{v}",value))}</p><div class="ability-rules"><p><b>Target</b>${target}</p><p><b>Cost</b>${skill.ultimate ? `All ${G.CHARGE} charge · no die` : `${requirement(skill)} shared die · once per turn`}</p>${skill.ultimate ? `<p><b>Charge</b>${h.charge} / ${G.CHARGE}</p>` : ""}</div><p class="subtle">${skill.ultimate ? "Build charge by using basic abilities. Some passives, upgrades and relics also grant charge. Charge resets at each battle." : "Select a die to see the exact amount including your current bonuses."}</p>${skill.extra ? `<p class="subtle">Also applies ${skill.extraValue ?? 1} ${effectNames[skill.extra]}.</p>` : ""}${skill.ultimate ? btn("cast-ultimate", reason || (skill.target === "ally" || skill.target === "enemy" ? "Choose target" : "Unleash " + skill.name), "primary wide", Boolean(reason)) : btn("close", "Back to planning", "primary wide")}${btn("help", "Explain combat terms", "text-button wide")}`;
+  }
   if (modal.startsWith("enemy:")) {
     const e = run!.battle!.enemies.find((e) => e.uid === modal.slice(6))!;
     const d = enemyDef(e.defId);
-    return `<div class="eyebrow">${e.boss ? "FLOOR GUARDIAN" : e.elite ? "ELITE MACHINE" : "HOSTILE MACHINE"}</div><h2>${d.name}</h2><p>${d.blurb}</p><p><b>${e.intent.name}</b> · ${e.stun ? "Jammed this turn" : e.intent.value + " " + e.intent.effect}</p><p class="subtle">${e.hp}/${e.maxHp} HP · ${e.shield} Block · ${e.mark} Mark · ${e.shock} Shock${e.staggered ? " · Recovering: immune to Jam this turn" : ""}</p>${e.boss ? "<p>Its attacks gain +2 damage each turn after turn three.</p>" : ""}`;
+    return `<div class="eyebrow">${e.boss ? "FLOOR GUARDIAN" : e.elite ? "ELITE MACHINE" : "HOSTILE MACHINE"}</div><h2>${d.name}</h2><p>${d.blurb}</p><p><b>${e.intent.name}</b> · ${e.stun ? "Jammed this turn" : e.intent.value + " " + e.intent.effect}</p><p class="subtle">${e.hp}/${e.maxHp} HP · ${e.shield} Block · ${e.mark} Mark · ${e.shock} Shock${e.staggered ? " · Recovering: immune to Jam this turn" : ""}</p>${e.boss ? `<p>Its attacks gain +${run!.difficulty === "paradox" ? 2 + G.cycleOf(run!) : 2} damage each turn after turn three.</p>` : ""}`;
   }
   if (modal === "seed")
     return `<div class="eyebrow">JOURNEY SETTINGS</div><h2>A different tomorrow.</h2><p>Leave the seed empty for a new route, or share one to explore the same world.</p><label class="seed-row" for="seed">Run seed<input id="seed" maxlength="20" placeholder="Random" value="${esc(seed)}" autocomplete="off" autocapitalize="characters" spellcheck="false" /></label>${btn("close", "Ready", "primary wide")}`;
@@ -486,7 +512,7 @@ function dialogContent() {
   }
   if (modal === "field") {
     const t = TERRAINS[run!.battle!.terrain];
-    return `<div class="eyebrow">BATTLEFIELD</div><h2>${t.name}</h2><p>${t.desc}</p>${run!.battle!.nodeType === "boss" ? "<p>Escalation: boss attacks gain +2 damage each turn after turn three. Intent cards include this increase.</p>" : ""}<div class="battle-log"><h3>Combat log</h3>${run!
+    return `<div class="eyebrow">BATTLEFIELD</div><h2>${t.name}</h2><p>${t.desc}</p>${run!.battle!.nodeType === "boss" ? `<p>Escalation: boss attacks gain +${run!.difficulty === "paradox" ? 2 + G.cycleOf(run!) : 2} damage each turn after turn three. Intent cards include this increase.</p>` : ""}<div class="battle-log"><h3>Combat log</h3>${run!
       .battle!.log.slice(-8)
       .map((line) => `<p>${esc(line)}</p>`)
       .join("")}</div>`;
@@ -504,7 +530,7 @@ function dialogContent() {
     }`;
 
   if (modal === "help")
-    return `<div class="eyebrow">FIELD MANUAL</div><h2>Make every die count.</h2><ol class="manual"><li><b>Read the enemy plans.</b> The enemy cards show what they will do when you end your turn.</li><li><b>Pick a shared die.</b> Choose a hero, choose an ability, then tap its target. Each basic ability is usable once per turn.</li><li><b>Keep the good rolls.</b> Tap a die’s lock to keep it. Reroll the rest up to twice each turn.</li><li><b>Build a combination.</b> Mark adds damage to every hit. Shock deals damage before enemies act, then falls by 1. Weak reduces attacks by 2.</li><li><b>Protect your squad.</b> Block absorbs damage and expires at your next turn. Pierce ignores Block. Armor reduces every hit.</li><li><b>Charge an ultimate.</b> Six ability uses unlock a powerful move that needs no die. Charge resets between fights.</li><li><b>Recruit and adapt.</b> A squad holds three heroes. A fallen hero is lost after the fight. Camps, relics, and upgrades can keep a run alive.</li></ol><p class="subtle">Boss attacks strengthen by 2 each turn after turn three. Jammed enemies skip their action and are immune to another jam on the following turn. Event damage leaves at least 1 HP.</p>`;
+    return `<div class="eyebrow">FIELD MANUAL</div><h2>Make every die count.</h2><ol class="manual"><li><b>Read the enemy plans.</b> The enemy cards show what they will do when you end your turn.</li><li><b>Pick a shared die.</b> Choose a hero, choose an ability, then tap its target. Each basic ability is usable once per turn.</li><li><b>Keep the good rolls.</b> Tap a die’s lock to keep it. Reroll the rest up to twice each turn.</li><li><b>Build a combination.</b> Mark adds damage to every hit. Shock deals damage before enemies act, then falls by 1. Weak reduces attacks by 2.</li><li><b>Protect your squad.</b> Block absorbs damage and expires at your next turn. Pierce ignores Block. Armor reduces every hit.</li><li><b>Charge an ultimate.</b> Reach six charge to unlock a powerful move that needs no die. Tap the ultimate button at any time to read its exact effect; nothing is spent until you confirm. Charge resets between fights.</li><li><b>Recruit and adapt.</b> A squad holds three heroes. A fallen hero is lost after the fight. Camps, relics, and upgrades can keep a run alive.</li></ol><p class="subtle">Boss attacks strengthen each turn after turn three: +2 in Standard/Hard, +3 / +4 / +5 across Paradox timelines. Intent cards include this increase. Jammed enemies skip their action and are immune to another jam on the following turn. Event damage leaves at least 1 HP. Power strengthens attacks and healing. Taunt redirects single-target attacks to the taunting hero. Drain heals its user for half the damage dealt, rounded up. Jam makes enemies skip an action.</p><p class="subtle">Win Hard to unlock Paradox: three five-floor timelines, with two full campaign rewinds. Lyra is a mythic recruit found very rarely from floor two onward. Her Reprise can only be used once in each fight.</p>`;
   if (modal === "end")
     return `<h2>Leave dice unused?</h2><p>You have ${run!.battle!.dice.filter((d) => !d.used).length} dice left. Enemies will execute their displayed plans.</p>${btn("confirm-end", "End turn", "primary wide")}${btn("close", "Keep planning", "text-button wide")}`;
   if (modal === "new")
@@ -517,7 +543,7 @@ function dialogContent() {
   }
   if (modal === "squad")
     return `<h2>Your coalition</h2><div class="choices">${run!.party.map((h) => `<div class="roster-card"><strong style="color:${heroDef(h.defId).color}">${heroDef(h.defId).name}</strong><p>${heroDef(h.defId).role} · Lv.${h.level} · ${h.hp}/${h.maxHp} HP</p><small>${h.mods.length ? h.mods.map((m) => MODS.find((x) => x.id === m)!.name).join(" · ") : "No permanent upgrades yet."}</small></div>`).join("")}</div>`;
-  return `<div class="eyebrow">MESHBREAKERS</div><h2>Take a breath.</h2><div class="menu-options">${btn("help", `${icon("book")} Field manual`, "choice-card")}${run ? btn("squad", `${icon("people")} Your squad`, "choice-card") : ""}${btn("sound", `${icon(settings.sound ? "sound" : "mute")} Sound <b>${settings.sound ? "On" : "Off"}</b>`, "choice-card")}${btn("motion", `${icon("star")} Reduced motion <b>${settings.reduced ? "On" : "Off"}</b>`, "choice-card")}${btn("quality", `${icon("volume")} Battery saver <b>${settings.low ? "On" : "Off"}</b>`, "choice-card")}${screen === "game" ? btn("home", `${icon("map")} Save & return to title`, "choice-card") : ""}</div><p class="subtle">${run ? "Run " + esc(run.seed) + " · " : ""}Saves stay on this device.</p><div class="install-tip"><b>Play from your Home Screen</b><p>In iPhone Safari, open Share and choose “Add to Home Screen.”</p></div>`;
+  return `<div class="eyebrow">MESHBREAKERS</div><h2>Take a breath.</h2><div class="menu-options">${btn("help", `${icon("book")} Field manual`, "choice-card")}${run ? btn("squad", `${icon("people")} Your squad`, "choice-card") : ""}${btn("sound", `${icon(settings.sound ? "sound" : "mute")} Effects <b>${settings.sound ? "On" : "Off"}</b>`, "choice-card")}${btn("music", `${icon(settings.music ? "sound" : "mute")} Music <b>${settings.music ? "On" : "Off"}</b>`, "choice-card")}<label class="music-level">Music volume<input id="music-volume" type="range" min="0" max="100" value="${Math.round(settings.musicVolume*100)}" aria-label="Music volume" /></label>${btn("credits", `${icon("star")} Credits & soundtrack`, "choice-card")}${btn("motion", `${icon("star")} Reduced motion <b>${settings.reduced ? "On" : "Off"}</b>`, "choice-card")}${btn("quality", `${icon("volume")} Battery saver <b>${settings.low ? "On" : "Off"}</b>`, "choice-card")}${screen === "game" ? btn("home", `${icon("map")} Save & return to title`, "choice-card") : ""}</div><p class="subtle">${run ? "Run " + esc(run.seed) + " · " : ""}Saves stay on this device.</p><div class="install-tip"><b>Play from your Home Screen</b><p>In iPhone Safari, open Share and choose “Add to Home Screen.”</p></div>`;
 }
 let previousFocus: HTMLElement | null = null;
 function renderModal() {
@@ -561,7 +587,7 @@ async function resolve(fx: Parameters<Arena["animate"]>[0]) {
   }
 }
 function start() {
-  run = G.createRun(seed || G.newSeed(), starter, difficulty);
+  run = G.createRun(seed || G.newSeed(), starter, difficulty, progress);
   screen = "game";
   selectedHero = run.party[0].uid;
   resetSelection();
@@ -612,6 +638,7 @@ async function useSkill(id: string) {
     s = heroDef(h.defId).skills.find((s) => s.id === id)!;
   const reason = G.skillReason(run, h, s, selectedDie);
   if (reason) {
+    if (!s.ultimate) { openModal("ability:" + id); return; }
     notify(
       reason === "Select a die" ? "Pick one of the shared dice first." : reason,
     );
@@ -630,6 +657,10 @@ async function doEnd() {
   await resolve(fx);
 }
 app.addEventListener("input", (e) => {
+  if ((e.target as HTMLElement).id === "music-volume") {
+    settings.musicVolume = Number((e.target as HTMLInputElement).value)/100;
+    music.configure(settings.music, settings.musicVolume); save();
+  }
   if ((e.target as HTMLElement).id === "seed")
     seed = (e.target as HTMLInputElement).value;
 });
@@ -641,8 +672,23 @@ app.addEventListener("click", async (e) => {
   const action = button.dataset.action!,
     id = button.dataset.id ?? "";
   sound.unlock();
+  music.unlock();
   if (!["target", "end", "confirm-end"].includes(action)) sound.play("click");
   switch (action) {
+    case "credits": openModal("credits"); break;
+    case "preview-track": music.setCue(id as keyof typeof TRACKS); notify(TRACKS[id as keyof typeof TRACKS].title); break;
+    case "replay-intro": closeModal(); studioIntro(settings.reduced, () => {sound.unlock(); music.unlock(); sound.play("intro");}); break;
+    case "music": settings.music = !settings.music; music.configure(settings.music, settings.musicVolume); save(); render(); break;
+    case "select-paradox": if (progress.hardCleared) {difficulty = "paradox"; closeModal(); render();} break;
+    case "rewind-cycle": {
+      if (!G.rewindCycle(run!)) break;
+      save(); busy = true; sound.play("rewind");
+      const veil = document.createElement("div"); veil.className = "time-transition";
+      veil.innerHTML = `<span>THE HOUR UNWRITES ITSELF</span><strong>${["I","II","III"][G.cycleOf(run!)-1]}</strong><small>TIMELINE ${G.cycleOf(run!)} / 3</small>`;
+      document.body.append(veil);
+      await new Promise(resolve => setTimeout(resolve, settings.reduced ? 60 : 1650));
+      busy = false; resetSelection(); render(); veil.remove(); break;
+    }
     case "page":
       choicePage = Math.max(0, choicePage + Number(id));
       render();
@@ -664,7 +710,8 @@ app.addEventListener("click", async (e) => {
       render();
       break;
     case "difficulty":
-      difficulty = id as "normal" | "hard";
+      if (id === "paradox") { openModal("paradox"); break; }
+      difficulty = id as Difficulty;
       render();
       break;
     case "start":
@@ -753,6 +800,10 @@ app.addEventListener("click", async (e) => {
       await useSkill(id);
       break;
     case "ultimate":
+      openModal("ability:u");
+      break;
+    case "cast-ultimate":
+      closeModal();
       await useSkill("u");
       break;
     case "target":
@@ -901,9 +952,11 @@ document.addEventListener("keydown", (e) => {
 window.addEventListener("pagehide", save);
 document.addEventListener("visibilitychange", () => {
   if (document.hidden) save();
+  music.visibility(document.hidden);
 });
 document.documentElement.classList.toggle("reduce-motion", settings.reduced);
 render();
+studioIntro(settings.reduced, () => {sound.unlock(); music.unlock(); sound.play("intro");});
 if (
   "serviceWorker" in navigator &&
   location.protocol === "https:" &&

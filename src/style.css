@@ -2605,3 +2605,65 @@ em {
     right: 10px;
   }
 }
+
+/* The Unwritten Hour — studio ident, score controls and temporal chapter. */
+.studio-boot{position:fixed;inset:0;z-index:1000;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#050b17;color:#eee6d4;overflow:hidden;isolation:isolate;transition:opacity .45s ease}
+.studio-boot.leaving{opacity:0;pointer-events:none}
+.boot-horizon{position:absolute;width:130vw;height:130vw;max-width:1000px;max-height:1000px;border-radius:50%;border:1px solid #7699c633;background:radial-gradient(ellipse at center,#30587944 0,#18294422 26%,transparent 62%);box-shadow:0 0 100px #80b3d611;transform:rotateX(74deg);animation:boot-horizon 5s ease-out both;z-index:-1}
+.boot-stars{position:absolute;inset:-15%;background:radial-gradient(circle at 22% 31%,#e2d7bccc 0 1px,transparent 2px),radial-gradient(circle at 73% 28%,#b6d1f7aa 0 1px,transparent 2px),radial-gradient(circle at 64% 63%,#acc4e488 0 1px,transparent 2px),radial-gradient(circle at 30% 77%,#c9d4ed66 0 1px,transparent 2px);background-size:230px 280px,370px 430px,320px 380px,440px 460px;animation:boot-stars 7s linear both;z-index:-1}
+.boot-core{position:relative;width:132px;height:132px;margin-bottom:42px;display:grid;place-items:center;animation:boot-materialize 1.7s cubic-bezier(.15,.75,.3,1) both}
+.boot-core i{position:absolute;inset:8px;border:1px solid #d0ba8b;border-left-color:transparent;border-bottom-color:#54759b;border-radius:50%;box-shadow:0 0 18px #a9d1ef18;animation:boot-orbit 5.7s cubic-bezier(.15,.65,.15,1) both}
+.boot-core i:nth-child(2){inset:21px;transform:rotateX(60deg) rotateZ(50deg);border-color:#98c9f0;animation-direction:reverse}
+.boot-core i:nth-child(3){inset:35px;transform:rotateY(65deg);border-color:#e6d2a2;animation-delay:.2s}
+.boot-core b{font-size:51px;font-weight:400;text-shadow:0 0 14px #dfd0a5,0 0 45px #73b5ed;color:#f0e8d6;animation:boot-spark 2.1s ease-out both}
+.boot-credit{text-align:center;display:flex;flex-direction:column;gap:10px;animation:credit-arrive 1.25s 1s ease both;padding:0 24px}
+.boot-credit>span{font-size:11px;letter-spacing:3px;color:#a7b8ce;margin-bottom:8px}
+.boot-credit strong{font:400 clamp(24px,6.5vw,38px) Georgia,serif;letter-spacing:1px}
+.boot-credit em{font:italic 15px Georgia,serif;color:#9db0c7}
+.boot-skip{position:absolute;bottom:calc(26px + env(safe-area-inset-bottom));padding:14px 28px;min-height:48px;font-size:11px;letter-spacing:2px;color:#c6d6ea;animation:credit-arrive 1s 2s both}
+.boot-skip span{display:block;font-size:10px;letter-spacing:.3px;color:#859bb7;margin-top:8px}
+@keyframes boot-materialize{from{opacity:0;transform:scale(.55) rotate(-70deg);filter:blur(10px)}to{opacity:1;transform:scale(1) rotate(0);filter:blur(0)}}
+@keyframes boot-orbit{from{transform:rotate(-220deg) rotateY(68deg)}to{transform:rotate(120deg) rotateY(24deg)}}
+@keyframes boot-spark{0%{opacity:0;transform:scale(.1)}60%{opacity:1;transform:scale(1.12)}100%{transform:scale(1)}}
+@keyframes credit-arrive{from{opacity:0;transform:translateY(14px);filter:blur(3px)}to{opacity:1;transform:translateY(0);filter:blur(0)}}
+@keyframes boot-horizon{from{opacity:0;transform:rotateX(74deg) scale(.6)}to{opacity:1;transform:rotateX(74deg) scale(1)}}
+@keyframes boot-stars{from{opacity:0;transform:translateY(8px)}30%{opacity:.8}to{opacity:.65;transform:translateY(-16px)}}
+.studio-boot.still *{animation:none!important}
+.attract-caption{position:absolute;bottom:29px;left:16px;right:16px;pointer-events:none;text-align:center;text-shadow:0 2px 8px #000;z-index:3}
+.attract-kicker{font-size:7px;letter-spacing:2.8px;color:#c7b791}
+.attract-caption p{font:italic clamp(12px,2.8vw,16px) Georgia,serif;color:#d3dfed;margin:8px 0 9px}
+.attract-caption i{display:block;width:55px;height:1px;background:linear-gradient(90deg,transparent,#b3cce8,transparent);margin:auto}
+.paradox-chip{display:flex;gap:3px;align-items:center;justify-content:center;color:#d6be8b}
+.paradox-chip svg{width:10px;height:10px}
+.difficulty{flex-shrink:0}.chip{min-width:61px}.seed-button{min-width:0;flex-shrink:1}
+.cycle-tag{color:#e7c995!important}
+.music-level{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:8px 15px 16px;font-size:12px;color:#9eb5d3}
+.music-level input{width:55%;accent-color:#cbb58a;min-height:30px}
+.credits-line{line-height:1.9}.credits-line b{color:#ecd8b0}
+.track-list{display:grid;gap:8px;margin:15px 0}
+.track-list .choice-card{padding:12px;min-height:64px}
+.track-list .choice-card strong{font-size:14px}
+.ability-description{font-size:17px!important;line-height:1.7!important;color:#ecf0f8!important}
+.ability-rules{border-top:1px solid #809bbc33;border-bottom:1px solid #809bbc33;padding:8px 0;margin:20px 0}
+.ability-rules p{display:flex;justify-content:space-between;gap:20px;font-size:13px;text-align:right}
+.ability-rules b{color:#d4bf96;text-align:left;flex-shrink:0}
+.rule-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;text-align:center;margin:25px 0}
+.rule-grid b{display:block;font:28px Georgia,serif;color:#ecd7ae}.rule-grid span{font-size:10px;text-transform:uppercase;letter-spacing:1px;color:#a5bad6}
+.mythic{border-color:#d8bd8266;background:linear-gradient(110deg,#594d2e33,#1b2b46)}
+.mythic .recruit-avatar{box-shadow:0 0 25px #dcc99722}
+.unlock-banner{display:flex;gap:12px;align-items:center;padding:12px;border:1px solid #b7a07566;background:#a18b4d18;margin-bottom:12px;color:#e5cc9a}
+.unlock-banner strong,.unlock-banner small{display:block}.unlock-banner strong{font-size:11px;letter-spacing:2px}.unlock-banner small{color:#b4c7e1;font-size:11px;margin-top:4px}
+.rewind-panel{text-align:center}.rewind-panel .journey-heading h2{font-style:italic}
+.timeline-seal{align-self:center;display:grid;place-items:center;width:82px;height:82px;min-height:82px;border:1px solid #cdb98a;border-radius:50%;outline:1px solid #b6cbe433;outline-offset:7px;margin:15px auto;color:#e8d7b1;font:38px Georgia,serif;box-shadow:0 0 35px #b2d3ff17}
+.carry-note{font-size:11px;line-height:1.7;color:#b7c8de;max-width:370px;margin:8px auto 16px}
+.time-transition{position:fixed;inset:0;z-index:900;background:radial-gradient(ellipse at center,#254468,#040b17 72%);display:flex;flex-direction:column;align-items:center;justify-content:center;color:#e3d1ab;animation:time-fold 1.65s ease-in-out both;pointer-events:all}
+.time-transition:before,.time-transition:after{content:"";position:absolute;width:70vmin;height:70vmin;border:1px solid #aab9d833;border-radius:50%;transform:rotateX(65deg);box-shadow:0 0 45px #dfd1ae11}
+.time-transition:after{transform:rotateY(65deg)}
+.time-transition>span{font-size:9px;letter-spacing:3px}.time-transition strong{font:100px Georgia,serif;margin:24px}.time-transition small{font-size:10px;letter-spacing:3px;color:#a4bddd}
+@keyframes time-fold{0%{opacity:0;filter:blur(5px)}15%,80%{opacity:1;filter:blur(0)}100%{opacity:0}}
+.float-text.rewind{color:#f1dfa9;text-shadow:0 0 14px #9bcfff}
+@media(max-width:380px){.chip{min-width:54px;font-size:10px}.difficulty{gap:1px;padding:2px}.run-options{gap:4px}.seed-button{font-size:9px;gap:3px}.top-info{gap:7px}.cycle-tag{font-size:10px}}
+@media(min-width:900px){.attract-caption{bottom:48px}.attract-caption p{font-size:20px}.attract-kicker{font-size:9px}}
+@media(max-height:700px) and (orientation:portrait){.attract-caption{bottom:25px}.attract-kicker{display:none}.attract-caption p{font-size:11px;margin:5px 0}.rewind-panel .timeline-seal{width:55px;height:55px;min-height:55px;font-size:25px;margin:7px auto}.rewind-panel .story{font-size:12px}.carry-note{font-size:10px;margin:3px auto 8px}}
+@media(max-height:480px) and (orientation:landscape){.boot-core{width:85px;height:85px;margin-bottom:16px}.boot-credit{gap:5px}.boot-credit strong{font-size:24px}.boot-skip{bottom:3px;font-size:9px;padding:8px}.boot-skip span{display:none}.attract-kicker{display:none}.attract-caption{bottom:12px}.attract-caption p{font-size:11px}.timeline-seal{display:none}.carry-note{font-size:10px;margin:5px auto}}
+.reduce-motion .studio-boot *,.reduce-motion .time-transition{animation:none!important;transition:none!important}

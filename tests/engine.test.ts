@@ -211,8 +211,8 @@ describe("recruitment, upgrades, events, and endings", () => {
     G.endTurn(r);
     expect(r.screen).toBe("won");
   });
-  it("all fifteen heroes have legal, distinct kits", () => {
-    expect(HEROES).toHaveLength(15);
+  it("all sixteen heroes have legal, distinct kits", () => {
+    expect(HEROES).toHaveLength(16);
     for (const h of HEROES) {
       expect(h.skills).toHaveLength(4);
       expect(h.skills.filter((s) => s.ultimate)).toHaveLength(1);

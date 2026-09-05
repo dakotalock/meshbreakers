@@ -293,6 +293,68 @@ export function buildCharacter(
     steel = enemy ? "#5d687c" : "#8eabb9",
     ivory = enemy ? "#b6c5d6" : "#dce1dc",
     gold = "#c9b38b";
+  if (model === "dragon") {
+    // A quadruped clockwork wyrm: articulated jaws, flight vanes, tail and gyroscopic heart.
+    head.position.set(0, 2.15, .86);
+    ball(body, .7, [0, 1.38, -.3], dark, [.8, .8, 1.65], .85);
+    for (let i=0;i<5;i++) {
+      const z=.38-i*.34;
+      plate(body,[1.02-i*.06,.2,.32],[0,1.82-Math.abs(i-1)*.035,z],ivory,.85);
+      crystal(body,[0,2.02,z],gold,[.08,.2,.13]);
+      for (const side of [-1,1]) plate(body,[.06,.38,.2],[side*(.48-i*.02),1.48,z],gold,.9).rotation.z=side*.2;
+    }
+    plate(body,[.45,.7,.48],[0,1.72,.53],steel,.85).rotation.x=.3;
+    plate(head,[.6,.48,.67],[0,0,0],ivory,.9);
+    plate(head,[.44,.25,.68],[0,-.05,.43],steel,.9);
+    const jaw=group(head,[0,-.22,.24]); cloth.push(jaw);
+    plate(jaw,[.39,.09,.65],[0,0,.18],gold,.8);
+    for (const side of [-1,1]) {
+      plate(head,[.045,.07,.3],[side*.31,.04,.14],color,.5,3);
+      crystal(head,[side*.31,.4,-.19],gold,[.09,.47,.1]).rotation.x=-.48;
+      for (let j=0;j<3;j++) crystal(jaw,[side*.16,.08,j*.18],ivory,[.028,.1,.03]);
+      const wing=group(body,[side*.48,1.76,-.43]); cloth.push(wing);
+      for (let j=0;j<4;j++) {
+        const vane=plate(wing,[.16,1.52-j*.17,.09],[side*(.32+j*.27),.62-j*.06,-j*.2],j%2?gold:ivory,.85);
+        vane.rotation.z=side*(-.68-j*.15);
+        const light=plate(wing,[.025,1.35-j*.17,.025],[side*(.34+j*.27),.62-j*.06,.061-j*.2],color,.5,1.5);
+        light.rotation.z=vane.rotation.z;
+      }
+      // Thin mechanical membranes connect the feathered wing spars.
+      const membrane=new THREE.BufferGeometry();
+      membrane.setAttribute("position",new THREE.Float32BufferAttribute([0,0,0,side*1.65,1.3,-.35,side*.9,-.04,-1.0],3));
+      membrane.computeVertexNormals();
+      const membraneMaterial=new THREE.MeshStandardMaterial({color: "#657e9b",metalness:.8,roughness:.38,side:THREE.DoubleSide,transparent:true,opacity:.65});
+      membraneMaterial.userData.owned=true;
+      const membraneMesh=new THREE.Mesh(membrane,membraneMaterial); wing.add(membraneMesh);
+      for (const front of [true,false]) {
+        const leg=group(body,[side*.48,1.3,front?.55:-1.08]);
+        (front?arms:legs).push(leg);
+        ball(leg,.19,[0,0,0],gold);
+        plate(leg,[.22,.61,.26],[side*.12,-.31,0],ivory,.8).rotation.z=side*.3;
+        ball(leg,.14,[side*.21,-.58,0],steel);
+        plate(leg,[.18,.48,.18],[side*.2,-.8,.1],dark,.7).rotation.x=-.3;
+        plate(leg,[.3,.13,.37],[side*.2,-1.08,.21],gold,.85);
+        for(let j=0;j<3;j++) crystal(leg,[side*.2+(j-1)*.1,-1.1,.43],ivory,[.035,.035,.14]);
+      }
+    }
+    let tail=body;
+    for(let j=0;j<6;j++) {
+      const g=group(tail,j===0?[0,1.35,-1.25]:[0,-.1,-.31]); cloth.push(g);
+      plate(g,[.37-j*.045,.3-j*.03,.44],[0,0,-.13],j%2?gold:steel,.85);
+      crystal(g,[0,.24-j*.025,-.2],color,[.05,.16,.09]); tail=g;
+    }
+    const heart=group(body,[0,1.46,.51]); orbitals.push(heart);
+    crystal(heart,[0,0,0],color,[.22,.3,.22]);
+    hoop(heart,.34,.032,[0,0,0],gold,1);
+    hoop(heart,.29,.02,[0,0,0],color,2).rotation.y=Math.PI/2;
+    const clock=group(body,[0,2.2,-.55]); orbitals.push(clock);
+    hoop(clock,.72,.026,[0,0,0],gold,.6);
+    for(let j=0;j<12;j++) {
+      const a=j*Math.PI/6;
+      plate(clock,[.025,j%3===0?.13:.065,.025],[Math.sin(a)*.72,Math.cos(a)*.72,0],color,.7,1).rotation.z=-a;
+    }
+    return optimizeRig(rig);
+  }
   if (model === "drone") {
     rig.hover = true;
     head.position.y = 1.55;
@@ -651,7 +713,7 @@ export function buildCharacter(
   }
   // Coats, scarves, wing arrays, and armor give each recruit a recognizable silhouette.
   if (organic || ["atlas", "moth"].includes(u.defId)) {
-    const isCoat = ["iri", "mara", "vesper", "moth"].includes(u.defId);
+    const isCoat = ["iri", "mara", "vesper", "moth", "lyra"].includes(u.defId);
     cloak(
       body,
       isCoat ? "#394764" : color,
@@ -702,7 +764,7 @@ export function buildCharacter(
     plate(body, [0.06, 0.23, 0.03], [0, 1.76, 0.365], "#eefefa", 0.2, 1);
     plate(body, [0.2, 0.06, 0.03], [0, 1.76, 0.365], "#eefefa", 0.2, 1);
   }
-  if (["nyx", "hexa", "vesper", "moth"].includes(u.defId)) {
+  if (["nyx", "hexa", "vesper", "moth", "lyra"].includes(u.defId)) {
     const halo = group(head, [0, 0.38, -0.04]);
     orbitals.push(halo);
     hoop(halo, 0.34, 0.016, [0, 0, 0], color, 1.7).rotation.x = Math.PI / 2;
@@ -773,6 +835,19 @@ export function buildCharacter(
       cloak(body, "#573252", 1.55, 1.15, cloth);
       for (const side of [-1, 1])
         crystal(body, [side * 0.77, 2.35, -0.17], color, [0.16, 0.52, 0.16]);
+    }
+  }
+  if (u.defId === "lyra") {
+    const dial=group(body,[0,1.72,-.36]); orbitals.push(dial);
+    hoop(dial,.72,.021,[0,0,0],gold,.8);
+    hoop(dial,.62,.01,[0,0,0],color,1.8);
+    for(let j=0;j<12;j++) {
+      const a=j*Math.PI/6;
+      crystal(dial,[Math.sin(a)*.69,Math.cos(a)*.69,0],gold,[.025,.075,.025]).rotation.z=-a;
+    }
+    for(const side of [-1,1]) {
+      plate(body,[.15,.78,.05],[side*.28,1.14,.29],ivory,.75).rotation.z=side*.13;
+      crystal(body,[side*.53,2.04,0],gold,[.1,.25,.12]);
     }
   }
   if (u.defId === "juno") {

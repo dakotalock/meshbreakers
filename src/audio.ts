@@ -115,6 +115,8 @@ export class Sound {
       return;
     }
     const notes: Record<string, number[]> = {
+      intro: [293.66, 440, 523.25, 698.46, 659.25],
+      rewind: [880, 659.25, 587.33, 440, 293.66],
       heal: [523.25, 659.25, 783.99],
       shield: [392, 587.33],
       mark: [880, 659.25],
@@ -126,7 +128,7 @@ export class Sound {
       win: [293.66, 392, 493.88, 587.33, 783.99],
     };
     const chord = notes[kind] ?? notes.click,
-      long = kind === "ultimate" || kind === "win";
+      long = ["ultimate", "win", "intro", "rewind"].includes(kind);
     chord.forEach((f, i) =>
       this.tone(
         f,
