@@ -18,6 +18,7 @@ import {
 import { icon, dicePips } from "./icons";
 import * as G from "./engine";
 import * as J from "./journey";
+import * as A from "./audioSettings";
 import type { Run, Unit, Skill, Difficulty } from "./types";
 const app = document.querySelector<HTMLDivElement>("#app")!;
 let run: Run | null = null,
@@ -135,7 +136,7 @@ function unitName(u: Unit) {
 }
 function topbar() {
   const r = screen === "game" ? run : null;
-  return `<header class="topbar"><div class="wordmark">${icon("hex")}<span>MESH<b>BREAKERS</b></span></div><div class="top-info">${r ? `<span class="sector"><small class="run-mode" data-difficulty="${r.difficulty}">${G.modeName(r.difficulty)}${r.difficulty === "paradox" ? ` · ${["I","II","III"][G.cycleOf(r)-1]}` : ""}</small><span>FLOOR <b>${r.act}</b> / ${G.campaignFloors(r)}</span></span><span class="scrap">${icon("diamond")} ${r.gold}</span>` : '<span class="build-tag">THE UNWRITTEN HOUR</span>'}</div><div class="top-actions">${r ? btn("relics", `${icon("diamond")}<small>${r.relics.length}</small>`, "icon-button relic-count", false, 'aria-label="Inspect collected relics"') : btn("sound", icon(settings.sound ? "sound" : "mute"), "icon-button", false, 'aria-label="Toggle sound effects"')}${btn("menu", icon("menu"), "icon-button", false, 'aria-label="Game menu"')}</div></header>`;
+  return `<header class="topbar"><div class="wordmark">${icon("hex")}<span>MESH<b>BREAKERS</b></span></div><div class="top-info">${r ? `<span class="sector"><small class="run-mode" data-difficulty="${r.difficulty}">${G.modeName(r.difficulty)}${r.difficulty === "paradox" ? ` · ${["I","II","III"][G.cycleOf(r)-1]}` : ""}</small><span>FLOOR <b>${r.act}</b> / ${G.campaignFloors(r)}</span></span><span class="scrap">${icon("diamond")} ${r.gold}</span>` : '<span class="build-tag">THE UNWRITTEN HOUR</span>'}</div><div class="top-actions">${btn("mute", icon(A.isMuted(settings) ? "mute" : "sound"), "icon-button", false, `aria-label="${A.isMuted(settings) ? "Unmute audio" : "Mute audio"}" aria-pressed="${A.isMuted(settings)}"`)}${r ? btn("relics", `${icon("diamond")}<small>${r.relics.length}</small>`, "icon-button relic-count", false, 'aria-label="Inspect collected relics"') : ""}${btn("menu", icon("menu"), "icon-button", false, 'aria-label="Game menu"')}</div></header>`;
 }
 function titlePanel() {
   const d = heroDef(starter);
@@ -597,7 +598,9 @@ async function resolve(fx: Parameters<Arena["animate"]>[0]) {
 }
 function start() {
   rememberDifficulty(difficulty);
-  run = G.createRun(seed || G.newSeed(), starter, difficulty, progress);
+  const runSeed = seed || G.newSeed();
+  J.applyDevUnlock(runSeed, progress);
+  run = G.createRun(runSeed, starter, difficulty, progress);
   screen = "game";
   selectedHero = run.party[0].uid;
   resetSelection();
@@ -696,7 +699,7 @@ app.addEventListener("click", async (e) => {
     id = button.dataset.id ?? "";
   sound.unlock();
   music.unlock();
-  if (!["target", "end", "confirm-end"].includes(action)) sound.play("click");
+  if (!["target", "end", "confirm-end", "mute"].includes(action)) sound.play("click");
   switch (action) {
     case "credits": openModal("credits"); break;
     case "preview-track": music.setCue(id as keyof typeof TRACKS); notify(TRACKS[id as keyof typeof TRACKS].title); break;
@@ -762,6 +765,13 @@ app.addEventListener("click", async (e) => {
       closeModal();
       render();
       break;
+    case "mute": {
+      const enabled = A.toggleMute(settings, sound, music);
+      save();
+      render();
+      if (enabled) sound.play("click");
+      break;
+    }
     case "sound":
       settings.sound = !settings.sound;
       sound.enabled = settings.sound;
