@@ -154,6 +154,12 @@ function sim(seed: string, starter: string) {
             "pax",
             "sable",
             "hexa",
+            "mara",
+            "atlas",
+            "sol",
+            "vale",
+            "moth",
+            "vesper",
           ];
           G.recruit(
             r,

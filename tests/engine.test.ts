@@ -14,11 +14,11 @@ describe("deterministic runs and legal progression", () => {
     expect(a).toEqual(b);
     expect(first("DAKOTA8").maps).not.toEqual(a.maps);
   });
-  it("generates 3 connected sectors with recruits and safehouses before bosses", () => {
+  it("generates 5 connected floors with recruits and safehouses before bosses", () => {
     for (let i = 0; i < 80; i++) {
       const r = first("MAP" + i);
-      expect(r.maps).toHaveLength(60);
-      for (let act = 1; act <= 3; act++) {
+      expect(r.maps).toHaveLength(100);
+      for (let act = 1; act <= 5; act++) {
         const nodes = r.maps.filter((n) => n.act === act);
         for (const n of nodes) {
           if (n.row < 7) expect(n.next.length).toBeGreaterThan(0);
@@ -201,8 +201,8 @@ describe("recruitment, upgrades, events, and endings", () => {
   });
   it("finishing the last boss reaches victory", () => {
     const r = first();
-    r.act = 3;
-    r.nodeId = "3-7-1";
+    r.act = 5;
+    r.nodeId = "5-7-1";
     r.battle!.nodeType = "boss";
     for (const e of r.battle!.enemies) {
       e.hp = 1;
@@ -211,8 +211,8 @@ describe("recruitment, upgrades, events, and endings", () => {
     G.endTurn(r);
     expect(r.screen).toBe("won");
   });
-  it("all nine heroes have legal, distinct kits", () => {
-    expect(HEROES).toHaveLength(9);
+  it("all fifteen heroes have legal, distinct kits", () => {
+    expect(HEROES).toHaveLength(15);
     for (const h of HEROES) {
       expect(h.skills).toHaveLength(4);
       expect(h.skills.filter((s) => s.ultimate)).toHaveLength(1);

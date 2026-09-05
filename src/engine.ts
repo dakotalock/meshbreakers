@@ -19,9 +19,11 @@ import {
   enemyDef,
   relicDef,
   STARTERS,
+  ACTS,
 } from "./content";
 export const SAVE_KEY = "meshbreakers.run.v2";
 export const CHARGE = 6;
+export const campaignFloors = (r: Run) => Math.max(...r.maps.map((n) => n.act));
 export function hash(seed: string) {
   let n = 2166136261;
   for (const c of seed) {
@@ -77,7 +79,9 @@ export function makeHero(r: Run, id: string): Unit {
 function makeEnemy(r: Run, id: string, elite = false, boss = false): Enemy {
   const d = enemyDef(id),
     hp = Math.round(
-      d.hp * (1 + (r.act - 1) * 0.22) * (r.difficulty === "hard" ? 1.15 : 1),
+      d.hp *
+        (1 + (r.act - 1) * 0.22 + Math.max(0, r.act - 2) ** 2 * 0.07) *
+        (r.difficulty === "hard" ? 1.15 : 1),
     );
   return {
     uid: "e" + ++r.seq,
@@ -103,7 +107,7 @@ function makeEnemy(r: Run, id: string, elite = false, boss = false): Enemy {
 }
 export function makeMaps(r: { rng: number }): MapNode[] {
   const maps: MapNode[] = [];
-  for (let act = 1; act <= 3; act++) {
+  for (let act = 1; act <= ACTS.length; act++) {
     for (let row = 0; row < 8; row++) {
       const cols = row === 0 || row === 7 ? [1] : [0, 1, 2];
       for (const col of cols) {
@@ -127,6 +131,8 @@ export function makeMaps(r: { rng: number }): MapNode[] {
                       ] as NodeType[]);
         if (row === 1 && col === 1) type = "fight";
         if (row === 4 && col === 2) type = "fight";
+        // Deeper floors require fighting through the security line.
+        if (act >= 3 && row === 4) type = col === 0 ? "elite" : "fight";
         const pools =
           act === 1
             ? [
@@ -136,21 +142,43 @@ export function makeMaps(r: { rng: number }): MapNode[] {
                 ["leech", "drone"],
                 ["volt", "drone"],
               ]
-            : [
-                ["ripper", "ward"],
-                ["volt", "leech"],
-                ["scribe", "ripper", "drone"],
-                ["ward", "volt"],
-                ["leech", "leech", "drone"],
-              ];
+            : act >= 3
+              ? [
+                  ["sentinel", "cantor"],
+                  ["reaper", "ward", "drone"],
+                  ["cantor", "scribe", "sentinel"],
+                  ["volt", "reaper", "leech"],
+                  ["sentinel", "sentinel", "scribe"],
+                ]
+              : [
+                  ["ripper", "ward"],
+                  ["volt", "leech"],
+                  ["scribe", "ripper", "drone"],
+                  ["ward", "volt"],
+                  ["leech", "leech", "drone"],
+                ];
         let encounter =
           type === "boss"
-            ? [["doorman"], ["census", "drone"], ["lattice", "ward"]][act - 1]
+            ? [
+                ["doorman"],
+                ["census", "drone"],
+                ["seraph", "sentinel"],
+                ["archivist", "reaper"],
+                ["lattice", "ward", "cantor"],
+              ][act - 1]
             : type === "elite"
-              ? pick(r, [
-                  ["bailiff", "drone"],
-                  ["hive", "ward"],
-                ])
+              ? pick(
+                  r,
+                  act >= 3
+                    ? [
+                        ["bailiff", "cantor", "sentinel"],
+                        ["hive", "reaper", "scribe"],
+                      ]
+                    : [
+                        ["bailiff", "drone"],
+                        ["hive", "ward"],
+                      ],
+                )
               : pick(r, pools);
         if (act === 1 && row === 0) encounter = ["drone", "drone"];
         maps.push({
@@ -271,7 +299,8 @@ function startBattle(r: Run, n: MapNode) {
       h.mods.filter((m) => m === "power").length * 2 + (coalition ? 2 : 0);
     h.armor =
       h.mods.filter((m) => m === "plating").length +
-      (h.defId === "coil" ? 1 : 0);
+      (h.defId === "coil" ? 1 : 0) +
+      (r.relics.includes("aegis") ? 1 : 0);
     h.charge = Math.min(
       CHARGE,
       h.mods.filter((m) => m === "charge").length * 2 +
@@ -286,7 +315,8 @@ function startBattle(r: Run, n: MapNode) {
         r,
         id,
         n.type === "elite",
-        n.type === "boss" && ["doorman", "census", "lattice"].includes(id),
+        n.type === "boss" &&
+          ["doorman", "census", "seraph", "archivist", "lattice"].includes(id),
       ),
     ),
     dice: [],
@@ -311,7 +341,9 @@ function startRound(r: Run, first = false) {
   const b = r.battle!;
   b.round++;
   r.stats.turns++;
-  b.rerolls = r.relics.includes("coffee") ? 3 : 2;
+  b.rerolls =
+    (r.relics.includes("coffee") ? 3 : 2) +
+    (first && r.relics.includes("clock") ? 1 : 0);
   b.taunt = null;
   for (const h of living(r)) {
     if (!first) h.shield = 0;
@@ -330,8 +362,11 @@ function makeIntent(r: Run, e: Enemy): Intent {
     round = b.round,
     d = enemyDef(e.defId),
     base =
-      Math.round(d.damage * (1 + (r.act - 1) * 0.18)) +
-      (r.difficulty === "hard" ? 1 : 0),
+      Math.round(
+        d.damage * (1 + (r.act - 1) * 0.18 + Math.max(0, r.act - 2) * 0.05),
+      ) +
+      (r.difficulty === "hard" ? 1 + Math.ceil(r.act * 0.7) : 0) +
+      (e.boss || e.elite ? Math.max(0, r.act - 2) * 2 : 0),
     a = living(r);
   const weakest = [...a].sort((x, y) => x.hp - y.hp)[0],
     target = pick(r, a).uid;
@@ -340,7 +375,16 @@ function makeIntent(r: Run, e: Enemy): Intent {
     name = "Attack",
     effect: Intent["effect"] = "hit",
     t = target,
-  ): Intent => ({ effect, value, target: t, name });
+  ): Intent => ({
+    effect,
+    value:
+      value +
+      (e.boss && ["hit", "sweep", "pierce"].includes(effect)
+        ? Math.max(0, round - 3) * 2
+        : 0),
+    target: t,
+    name,
+  });
   switch (e.defId) {
     case "ward":
       return round % 2 === 1
@@ -383,6 +427,36 @@ function makeIntent(r: Run, e: Enemy): Intent {
         : round % 3 === 2
           ? hit(base, "Piercing audit", "pierce", weakest.uid)
           : hit(15, "Firewall", "shield", e.uid);
+    case "sentinel":
+      return round % 2
+        ? hit(base, "Glass lance", "pierce")
+        : hit(12 + r.act, "Prismatic ward", "shield", e.uid);
+    case "cantor":
+      return hit(
+        base + (round % 3 === 0 ? 4 : 0),
+        round % 3 === 0 ? "Final verse" : "Null hymn",
+        "sweep",
+        "all",
+      );
+    case "reaper":
+      return hit(
+        base,
+        "Memory cut",
+        round % 2 === 0 ? "pierce" : "hit",
+        weakest.uid,
+      );
+    case "seraph":
+      return round % 3 === 1
+        ? hit(base, "Heaven's lance", "pierce")
+        : round % 3 === 2
+          ? hit(base - 3, "Falling stars", "sweep", "all")
+          : hit(25, "Crystal refuge", "shield", e.uid);
+    case "archivist":
+      return e.hp < e.maxHp / 2 && round % 2 === 0
+        ? hit(base - 2, "Memory storm", "sweep", "all")
+        : round % 3 === 0
+          ? hit(0, "Rewrite", "summon", e.uid)
+          : hit(base, "Redaction", "pierce", weakest.uid);
     case "lattice":
       return e.hp < e.maxHp / 2
         ? round % 2 === 0
@@ -428,6 +502,15 @@ export function skillValue(r: Run, h: Unit, s: Skill, value: number) {
       s.base +
         s.mult * value +
         (powered ? h.power : 0) +
+        (powered && value === 1 && r.relics.includes("cinder") ? 4 : 0) +
+        (["hit", "pierce", "sweep", "drain"].includes(s.effect) &&
+        h.defId === "vale" &&
+        value > 0 &&
+        value <= 2
+          ? 4
+          : 0) +
+        (s.effect === "pierce" && r.relics.includes("scalpel") ? 3 : 0) +
+        (s.effect === "heal" && r.relics.includes("mercy") ? 3 : 0) +
         (r.relics.includes("oil") &&
         ["hit", "pierce", "sweep", "drain"].includes(s.effect)
           ? 2
@@ -486,6 +569,12 @@ function damage(
       if (source.defId === "iri" && target.mark) amount += 3;
       if (source.defId === "pax" && source.hp < source.maxHp / 2) amount += 3;
       if (source.defId === "sable" && target.weak) amount += 3;
+      if (source.defId === "sol" && target.shock) amount += 3;
+      if (
+        r.relics.includes("hunter") &&
+        ((target as Enemy).boss || (target as Enemy).elite)
+      )
+        amount += 3;
       if (r.relics.includes("splinter") && !r.battle!.firstHit) {
         amount += 7;
         r.battle!.firstHit = true;
@@ -565,13 +654,25 @@ export function playSkill(
     value = s.ultimate ? 0 : d!.value,
     v = skillValue(r, h, s, value),
     fx: FX[] = [];
-  if (s.ultimate) h.charge = 0;
-  else {
+  if (s.ultimate) {
+    h.charge = 0;
+    fx.push({
+      kind: "ultimate",
+      source: h.uid,
+      target: h.uid,
+      value: 0,
+      label: s.name,
+      color: heroDef(h.defId).color,
+    });
+  } else {
     d!.used = true;
     h.used.push(s.id);
     h.charge = Math.min(
       CHARGE,
-      h.charge + 1 + (value === 6 && r.relics.includes("echo") ? 1 : 0),
+      h.charge +
+        1 +
+        (value === 6 && r.relics.includes("echo") ? 1 : 0) +
+        (h.defId === "vesper" && h.used.length === 1 ? 1 : 0),
     );
   }
   const apply = (effect: string, t: Unit, amount: number) => {
@@ -590,6 +691,7 @@ export function playSkill(
       }
       case "shield":
         t.shield += amount;
+        if (h.defId === "atlas" && t.uid !== h.uid) h.shield += 3;
         fx.push({
           kind: "shield",
           source: h.uid,
@@ -609,14 +711,29 @@ export function playSkill(
         });
         break;
       case "heal": {
-        const a = Math.min(t.maxHp - t.hp, amount);
+        const a = Math.min(
+          t.maxHp - t.hp,
+          amount + (h.defId === "mara" && t.hp < t.maxHp / 2 ? 3 : 0),
+        );
         t.hp += a;
         if (h.defId === "nyx") t.shield += 3;
         fx.push({ kind: "heal", source: h.uid, target: t.uid, value: a });
         break;
       }
       case "mark":
+        amount += r.relics.includes("scope") ? 1 : 0;
         t.mark += amount;
+        if (h.defId === "moth") {
+          const shock = 1 + (r.relics.includes("prism") ? 2 : 0);
+          t.shock += shock;
+          fx.push({
+            kind: "shock",
+            source: h.uid,
+            target: t.uid,
+            value: shock,
+            label: "SHOCK +" + shock,
+          });
+        }
         if (h.defId === "hexa") t.weak = Math.max(t.weak, 1);
         fx.push({ kind: "mark", source: h.uid, target: t.uid, value: amount });
         break;
@@ -668,6 +785,24 @@ export function playSkill(
       else apply(s.extra, t, s.extraValue ?? 0);
     }
   }
+  if (s.ultimate) {
+    if (r.relics.includes("mantle") && h.hp > 0) {
+      h.shield += 10;
+      fx.push({ kind: "shield", source: h.uid, target: h.uid, value: 10 });
+    }
+    if (r.relics.includes("afterglow"))
+      for (const ally of living(r)) {
+        const restored = Math.min(4, ally.maxHp - ally.hp);
+        ally.hp += restored;
+        if (restored)
+          fx.push({
+            kind: "heal",
+            source: h.uid,
+            target: ally.uid,
+            value: restored,
+          });
+      }
+  }
   log(r, `${heroDef(h.defId).name}: ${s.name}.`);
   checkBattle(r);
   return { ok: true, fx };
@@ -682,7 +817,9 @@ export function endTurn(r: Run): FX[] {
         r,
         e,
         e,
-        e.shock + (b.terrain === "conduit" ? 1 : 0),
+        e.shock +
+          (b.terrain === "conduit" ? 1 : 0) +
+          (e.mark && r.relics.includes("resonance") ? 2 : 0),
         true,
         fx,
         false,
@@ -808,7 +945,13 @@ function checkBattle(r: Run): boolean {
     (r.relics.includes("magnet") ? 15 : 0);
   r.gold += scrap;
   r.bonus = scrap;
-  if (b.nodeType === "boss" && r.act === 3) {
+  const recovery =
+    (r.relics.includes("rations") ? 3 : 0) +
+    (r.relics.includes("banner") && ["elite", "boss"].includes(b.nodeType)
+      ? 6
+      : 0);
+  if (recovery) healParty(r, recovery);
+  if (b.nodeType === "boss" && r.act === campaignFloors(r)) {
     r.screen = "won";
     r.result =
       "For the first time, the network is quiet enough to hear the rain.";
@@ -857,7 +1000,8 @@ function makeRewards(r: Run): Reward[] {
 }
 export function continueToMap(r: Run) {
   const n = currentNode(r);
-  if (n?.type === "boss" && r.act === n.act && r.act < 3) r.act++;
+  if (n?.type === "boss" && r.act === n.act && r.act < campaignFloors(r))
+    r.act++;
   r.screen = "map";
   r.rewards = [];
   r.battle = null;
@@ -1064,9 +1208,16 @@ export function loadRun(raw: string | null): Run | null {
       !Array.isArray(r.party) ||
       r.party.length > 3 ||
       !Array.isArray(r.maps) ||
-      r.maps.length !== 60 ||
+      ![60, ACTS.length * 20].includes(r.maps.length) ||
       !Array.isArray(r.relics) ||
       r.relics.some((id) => !RELICS.some((x) => x.id === id))
+    )
+      return null;
+    // Keep the original three-floor saves playable without rewriting their routes.
+    if (
+      ![3, ACTS.length].includes(campaignFloors(r)) ||
+      r.act < 1 ||
+      r.act > campaignFloors(r)
     )
       return null;
     if (

@@ -170,6 +170,7 @@ export type Run = {
 };
 export type FX = {
   kind:
+    | "ultimate"
     | "hit"
     | "shield"
     | "heal"
