@@ -77,4 +77,24 @@ describe("difficulty selection and saved journeys", () => {
     expect(progress.hardCleared).toBe(true);
     expect(G.loadProgress(null, G.loadRun(JSON.stringify(resumed))).hardCleared).toBe(true);
   });
+
+  it("applies the case-insensitive dev unlock seed like a Hard clearance", () => {
+    const progress = G.loadProgress(null);
+    expect(progress.hardCleared).toBe(false);
+    expect(J.applyDevUnlock("other-seed", progress)).toBe(false);
+    expect(progress.hardCleared).toBe(false);
+    expect(() => G.createRun("NOPE", "rook", "paradox", progress)).toThrow(/Hard/);
+    expect(J.applyDevUnlock("u2va-8pwo-hmfv", progress)).toBe(true);
+    expect(progress.hardCleared).toBe(true);
+    const progress2 = G.loadProgress(null);
+    const unlocked = G.createRun("u2va-8pwo-hmfv", "rook", "paradox", progress2);
+    expect(progress2.hardCleared).toBe(true);
+    expect(unlocked.difficulty).toBe("paradox");
+    expect(unlocked.seed).toBe("U2VA-8PWO-HMFV");
+    expect(G.cycleOf(unlocked)).toBe(1);
+    expect(J.restoreDifficulty("paradox", progress2, null)).toBe("paradox");
+    const again = G.createRun(J.DEV_UNLOCK_SEED.toLowerCase(), "rook", "hard", progress2);
+    expect(again.difficulty).toBe("hard");
+    expect(progress2.hardCleared).toBe(true);
+  });
 });
